@@ -52,8 +52,23 @@ export const EditModuleModal: React.FC<EditModuleModalProps> = ({
     return matchSeriesForRating(initialOverride?.series, initialSeriesList);
   });
 
+  const [terminalsPerRow, setTerminalsPerRow] = useState<4 | 7 | 8 | 11>(
+    module.crossModuleTerminalsPerRow || 7
+  );
+
   const handleRatingChange = (newRating: string) => {
     setRating(newRating);
+    // If rating specifies terminal count (e.g. 4x7, 4x4, 4x8, 4x11), update terminalsPerRow
+    if (newRating.includes('4 клем') || newRating.includes('4 отвор') || newRating.includes('×4')) {
+      setTerminalsPerRow(4);
+    } else if (newRating.includes('7 клем') || newRating.includes('7 отвор') || newRating.includes('×7')) {
+      setTerminalsPerRow(7);
+    } else if (newRating.includes('8 клем') || newRating.includes('8 отвор') || newRating.includes('×8')) {
+      setTerminalsPerRow(8);
+    } else if (newRating.includes('11 клем') || newRating.includes('11 отвор') || newRating.includes('×11')) {
+      setTerminalsPerRow(11);
+    }
+
     if (currentMfr) {
       const nextSeriesList = getAvailableSeriesForCategory(currentMfr.id, module.category, newRating);
       const adaptedSeries = matchSeriesForRating(selectedSeries, nextSeriesList);
@@ -87,11 +102,23 @@ export const EditModuleModal: React.FC<EditModuleModalProps> = ({
       };
     }
 
+    // Adjust module width according to terminalsPerRow for cross-modules if 11 or 4
+    let updatedWidth = module.width;
+    if (module.category === 'cross_module') {
+      if (terminalsPerRow === 11 && module.poles === 4) updatedWidth = 6;
+      else if (terminalsPerRow === 4 && module.poles === 4) updatedWidth = 2;
+      else if (terminalsPerRow === 11 && module.poles === 2) updatedWidth = 4;
+      else if (module.poles === 4) updatedWidth = 4;
+      else if (module.poles === 2) updatedWidth = 2;
+    }
+
     onSave({
       ...module,
       label,
       rating,
       phase,
+      width: updatedWidth,
+      crossModuleTerminalsPerRow: terminalsPerRow,
       manufacturerOverrides: updatedOverrides,
     });
   };
@@ -156,27 +183,65 @@ export const EditModuleModal: React.FC<EditModuleModalProps> = ({
           </div>
 
           {/* Phase selector */}
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1.5">
-              Фаза підключення:
-            </label>
-            <div className="grid grid-cols-4 gap-2">
-              {(['L1', 'L2', 'L3', '3F'] as const).map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => setPhase(p)}
-                  className={`py-1.5 text-xs font-bold rounded-lg border transition cursor-pointer ${
-                    phase === p
-                      ? 'bg-amber-100 text-amber-900 border-amber-400 font-bold'
-                      : 'bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200'
-                  }`}
-                >
-                  {p}
-                </button>
-              ))}
+          {module.category !== 'cross_module' && (
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                Фаза підключення:
+              </label>
+              <div className="grid grid-cols-4 gap-2">
+                {(['L1', 'L2', 'L3', '3F'] as const).map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setPhase(p)}
+                    className={`py-1.5 text-xs font-bold rounded-lg border transition cursor-pointer ${
+                      phase === p
+                        ? 'bg-amber-100 text-amber-900 border-amber-400 font-bold'
+                        : 'bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200'
+                    }`}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Cross-Module terminals per row selector */}
+          {module.category === 'cross_module' && (
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                Кількість отворів / клем в одному ряду (шині):
+              </label>
+              <div className="grid grid-cols-4 gap-2">
+                {([4, 7, 8, 11] as const).map((cnt) => (
+                  <button
+                    key={cnt}
+                    type="button"
+                    onClick={() => {
+                      setTerminalsPerRow(cnt);
+                      const prefix = module.poles === 4 ? '4×' : '2×';
+                      const newR = `${prefix}${cnt} клем (${cnt === 11 ? '125A' : '100A'})`;
+                      setRating(newR);
+                    }}
+                    className={`py-2 text-xs font-bold rounded-lg border transition cursor-pointer font-mono flex flex-col items-center justify-center ${
+                      terminalsPerRow === cnt
+                        ? 'bg-amber-500 text-slate-950 border-amber-500 shadow-sm font-black'
+                        : 'bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200'
+                    }`}
+                  >
+                    <span className="text-sm font-extrabold">{cnt}</span>
+                    <span className="text-[10px] opacity-75">клем/ряд</span>
+                  </button>
+                ))}
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1">
+                {module.poles === 4
+                  ? `4 шини (L1, L2, L3, N) × ${terminalsPerRow} клем = ${4 * terminalsPerRow} точок підключення`
+                  : `2 шини × ${terminalsPerRow} клем = ${2 * terminalsPerRow} точок підключення`}
+              </p>
+            </div>
+          )}
 
           {/* Series & Model for manufacturer */}
           {currentMfr && availableSeries.length > 0 && (

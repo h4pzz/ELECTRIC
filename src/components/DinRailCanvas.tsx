@@ -55,6 +55,7 @@ interface CircuitHighlight {
 }
 
 // Функція для пошуку всього електричного кола (проводів, модулів, шин) через BFS
+// ВАЖЛИВО: підсвічуються ТІЛЬКИ проводи та модулі, з'єднані однаковим кольором дроту (фаза/нуль/земля окремо)
 function getCircuitForWire(
   targetWireId: string,
   wires: WireConnection[],
@@ -63,6 +64,8 @@ function getCircuitForWire(
 ): CircuitHighlight | null {
   const targetWire = wires.find((w) => w.id === targetWireId);
   if (!targetWire) return null;
+
+  const targetColor = targetWire.color;
 
   const termKey = (moduleId: string, terminalType: string, poleIndex: number) =>
     `${moduleId}-${terminalType}-${poleIndex}`;
@@ -75,38 +78,87 @@ function getCircuitForWire(
     adj.get(k2)!.add(k1);
   };
 
-  // 1. Проводи з'єднують клеми між собою
-  wires.forEach((w) => {
+  // Фільтруємо дроти тільки за цільовим кольором
+  const matchingWires = wires.filter((w) => w.color === targetColor);
+
+  // 1. Проводи з'єднують клеми між собою (лише дроти однакового кольору)
+  matchingWires.forEach((w) => {
     const k1 = termKey(w.from.moduleId, w.from.terminalType, w.from.poleIndex);
     const k2 = termKey(w.to.moduleId, w.to.terminalType, w.to.poleIndex);
     addEdge(k1, k2);
   });
 
+  // Карта підключень для швидкого визначення кольорів на кожній клемі
+  const termColorSet = new Map<string, Set<WireColor>>();
+  wires.forEach((w) => {
+    const k1 = termKey(w.from.moduleId, w.from.terminalType, w.from.poleIndex);
+    const k2 = termKey(w.to.moduleId, w.to.terminalType, w.to.poleIndex);
+    if (!termColorSet.has(k1)) termColorSet.set(k1, new Set());
+    if (!termColorSet.has(k2)) termColorSet.set(k2, new Set());
+    termColorSet.get(k1)!.add(w.color);
+    termColorSet.get(k2)!.add(w.color);
+  });
+
+  // Перевіряє, чи має дана клема хоча б один підключений провід цільового кольору
+  const hasMatchingWire = (k: string) => termColorSet.get(k)?.has(targetColor) ?? false;
+
   // 2. Внутрішні з'єднання всередині приладів (автомати, УЗО, реле тощо):
-  // Кожен полюс проводить струм від верхньої клеми до нижньої
+  // Кожен полюс проводить струм від верхньої клеми до нижньої.
+  // Внутрішнє з'єднання полюса враховується лише якщо з обох боків (або хоча б з одного)
+  // підключено провід однакового кольору.
+  // Для крос-модулів (розподільчих блоків): всі клеми однієї шини (cm1, cm2, cm3, cm4) з'єднані паралельно.
   modules.forEach((m) => {
     if (m.category === 'blank') return;
-    if (m.category === 'switch') {
+    if (m.category === 'cross_module') {
+      const barsCount = m.poles === 4 ? 4 : m.poles === 2 ? 2 : 1;
+      const termsPerRow = m.crossModuleTerminalsPerRow || 7;
+      const tierNames: TerminalId['terminalType'][] = ['cm1', 'cm2', 'cm3', 'cm4'];
+      for (let b = 0; b < barsCount; b++) {
+        const tier = tierNames[b];
+        for (let i = 0; i < termsPerRow; i++) {
+          for (let j = i + 1; j < termsPerRow; j++) {
+            const k1 = termKey(m.id, tier, i);
+            const k2 = termKey(m.id, tier, j);
+            addEdge(k1, k2);
+          }
+        }
+      }
+    } else if (m.category === 'switch') {
       // Для перемикача 1-0-2: вхід I (top: p*2) та вхід II (top: p*2 + 1)
       // комутуються на вихід відповідного полюса (bottom: p)
       for (let p = 0; p < m.poles; p++) {
         const kTop1 = termKey(m.id, 'top', p * 2);
         const kTop2 = termKey(m.id, 'top', p * 2 + 1);
         const kBottom = termKey(m.id, 'bottom', p);
-        addEdge(kTop1, kBottom);
-        addEdge(kTop2, kBottom);
+        if (
+          (hasMatchingWire(kTop1) && hasMatchingWire(kBottom)) ||
+          (hasMatchingWire(kTop2) && hasMatchingWire(kBottom))
+        ) {
+          addEdge(kTop1, kBottom);
+          addEdge(kTop2, kBottom);
+        }
       }
     } else {
+      // Стандартні модулі (автомати, УЗО, реле, дифавтомати):
+      // Струм проходить через конкретний полюс тільки якщо на його клемах підключено дріт однакового кольору
       for (let p = 0; p < m.poles; p++) {
         const kTop = termKey(m.id, 'top', p);
         const kBottom = termKey(m.id, 'bottom', p);
-        addEdge(kTop, kBottom);
+        if (hasMatchingWire(kTop) && hasMatchingWire(kBottom)) {
+          addEdge(kTop, kBottom);
+        }
       }
     }
   });
 
   // 3. Шини N та PE: всі гвинтові отвори шини з'єднані спільною мідною планкою
+  // Шина N проводить тільки синій провід (blue), шина PE — тільки жовто-зелений (yellow_green)
   busBars.forEach((b) => {
+    const isMatchingBus =
+      (b.type === 'n' && targetColor === 'blue') ||
+      (b.type === 'pe' && targetColor === 'yellow_green');
+    if (!isMatchingBus) return;
+
     for (let i = 0; i < b.terminalsCount; i++) {
       for (let j = i + 1; j < b.terminalsCount; j++) {
         const k1 = termKey(b.id, 'bus', i);
@@ -136,9 +188,9 @@ function getCircuitForWire(
     }
   }
 
-  // 5. Визначаємо всі проводи, що належать до цього кола
+  // 5. Визначаємо всі проводи, що належать до цього кола (суворо однаковий колір)
   const wireIds = new Set<string>();
-  wires.forEach((w) => {
+  matchingWires.forEach((w) => {
     const k1 = termKey(w.from.moduleId, w.from.terminalType, w.from.poleIndex);
     const k2 = termKey(w.to.moduleId, w.to.terminalType, w.to.poleIndex);
     if (visited.has(k1) || visited.has(k2)) {
@@ -146,26 +198,16 @@ function getCircuitForWire(
     }
   });
 
-  // 6. Визначаємо всі модулі (автомати, УЗО, реле тощо), що беруть участь у колі
+  // 6. Визначаємо тільки ті модулі, клеми яких беруть участь у колі і мають дріт однакового кольору
   const moduleIds = new Set<string>();
-  modules.forEach((m) => {
-    const topCount = m.category === 'switch' ? m.poles * 2 : m.poles;
-    const bottomCount = m.poles;
-    for (let p = 0; p < topCount; p++) {
-      if (visited.has(termKey(m.id, 'top', p))) {
-        moduleIds.add(m.id);
-        return;
-      }
-    }
-    for (let p = 0; p < bottomCount; p++) {
-      if (visited.has(termKey(m.id, 'bottom', p))) {
-        moduleIds.add(m.id);
-        return;
-      }
+  matchingWires.forEach((w) => {
+    if (wireIds.has(w.id)) {
+      moduleIds.add(w.from.moduleId);
+      moduleIds.add(w.to.moduleId);
     }
   });
 
-  // 7. Визначаємо всі шини, що задіяні в колі
+  // 7. Визначаємо всі шини, що задіяні в цьому колі
   const busBarIds = new Set<string>();
   busBars.forEach((b) => {
     for (let i = 0; i < b.terminalsCount; i++) {
@@ -504,6 +546,16 @@ export const DinRailCanvas: React.FC<DinRailCanvasProps> = ({
     return mod ? mod.railIndex : 0;
   };
 
+  // Визначає, чи є клема верхнього спрямування (виходить вгору)
+  const isTopTerminal = (termType: TerminalId['terminalType']): boolean => {
+    return termType === 'top' || termType === 'cm1' || termType === 'cm2';
+  };
+
+  // Визначає, чи є клема нижнього спрямування (виходить вниз)
+  const isBottomTerminal = (termType: TerminalId['terminalType']): boolean => {
+    return termType === 'bottom' || termType === 'cm3' || termType === 'cm4';
+  };
+
   // Визначаємо, чи повинен провід проходити через бічний кабель-канал,
   // щоб не перекривати модулі верхнього ряду
   const shouldRouteViaSide = (
@@ -516,17 +568,20 @@ export const DinRailCanvas: React.FC<DinRailCanvasProps> = ({
     const r1 = getTerminalRail(fromTerm);
     const r2 = getTerminalRail(toTerm);
 
+    const fromIsTop = isTopTerminal(fromTerm.terminalType);
+    const toIsTop = isTopTerminal(toTerm.terminalType);
+
     // Якщо один з кінців - це шина N або PE нагорі (r === -1)
     if (r1 === -1 || r2 === -1) {
       const railMod = r1 === -1 ? r2 : r1;
-      const termType = r1 === -1 ? toTerm.terminalType : fromTerm.terminalType;
+      const modTermIsTop = r1 === -1 ? toIsTop : fromIsTop;
       // Якщо модуль знаходиться на рейці 1, 2, ... - між ним і шиною є рейка 0,
       // тому провід обов'язково йде через бічний кабель-канал
       if (railMod > 0) return true;
-      // Якщо модуль на верхній рейці (0), але підключення до нижньої клеми ('bottom') -
+      // Якщо модуль на верхній рейці (0), але підключення до нижньої клеми ('bottom' / 'cm3' / 'cm4') -
       // щоб не перетинати сам модуль 0-ї рейки, ведемо через бічний канал
-      if (railMod === 0 && termType === 'bottom') return true;
-      // Якщо верхня клема ('top') модуля 0-ї рейки та шина - вони виходять прямо в спільний верхній жолоб
+      if (railMod === 0 && !modTermIsTop) return true;
+      // Якщо верхня клема ('top' / 'cm1' / 'cm2') модуля 0-ї рейки та шина - вони виходять прямо в спільний верхній жолоб
       return false;
     }
 
@@ -537,19 +592,19 @@ export const DinRailCanvas: React.FC<DinRailCanvasProps> = ({
 
     // Суміжні рейки (наприклад рейка 0 і рейка 1)
     if (diff === 1) {
-      const upperType = r1 < r2 ? fromTerm.terminalType : toTerm.terminalType;
-      const lowerType = r1 < r2 ? toTerm.terminalType : fromTerm.terminalType;
-      // Верхній підключається знизу ('bottom'), а нижній зверху ('top'):
+      const upperIsTop = r1 < r2 ? fromIsTop : toIsTop;
+      const lowerIsTop = r1 < r2 ? toIsTop : fromIsTop;
+      // Верхній виходить знизу, а нижній виходить зверху:
       // вони дивляться прямо в один спільний міжкабельний жолоб! Не перетинають модулів.
-      if (upperType === 'bottom' && lowerType === 'top') {
+      if (!upperIsTop && lowerIsTop) {
         return false;
       }
       // Якщо ж провід іде на інший бік або перетинав би зображення автомата - ведемо через канал збоку
       return true;
     }
 
-    // На одній і тій же рейці: якщо клеми різні (bottom і top), ведемо через бічний канал
-    if (fromTerm.terminalType !== toTerm.terminalType) {
+    // На одній і тій же рейці: якщо спрямування різне (один виходить вгору, інший вниз), ведемо через бічний канал
+    if (fromIsTop !== toIsTop) {
       return true;
     }
 
@@ -560,8 +615,8 @@ export const DinRailCanvas: React.FC<DinRailCanvasProps> = ({
   const calculateSideRoutingPath = (
     fromPos: { x: number; y: number },
     toPos: { x: number; y: number },
-    fromType: 'top' | 'bottom' | 'bus',
-    toType: 'top' | 'bottom' | 'bus',
+    fromType: TerminalId['terminalType'],
+    toType: TerminalId['terminalType'],
     wireIndex: number,
     cWidth: number
   ): { pathD: string; deletePos: { x: number; y: number } } => {
@@ -581,7 +636,7 @@ export const DinRailCanvas: React.FC<DinRailCanvasProps> = ({
     // Розрахунок Y виходу з першої клеми в горизонтальний жолоб
     let y1_duct: number;
     let dirY1: number; // -1 вгору, +1 вниз
-    if (fromType === 'top') {
+    if (isTopTerminal(fromType)) {
       y1_duct = fromPos.y - V_MIN + ductYOffset;
       dirY1 = -1;
     } else {
@@ -592,10 +647,10 @@ export const DinRailCanvas: React.FC<DinRailCanvasProps> = ({
     // Розрахунок Y входу в другу клему з горизонтального жолоба
     let y2_duct: number;
     let dirYToTerm: number; // +1 входимо зверху вниз, -1 входимо знизу вгору
-    if (toType === 'top') {
+    if (isTopTerminal(toType)) {
       y2_duct = toPos.y - V_MIN + ductYOffset;
       dirYToTerm = 1;
-    } else if (toType === 'bottom') {
+    } else if (isBottomTerminal(toType)) {
       y2_duct = toPos.y + V_MIN + ductYOffset;
       dirYToTerm = -1;
     } else {
@@ -655,16 +710,19 @@ export const DinRailCanvas: React.FC<DinRailCanvasProps> = ({
   const calculateOrthogonalDirectPath = (
     fromPos: { x: number; y: number },
     toPos: { x: number; y: number },
-    fromType: 'top' | 'bottom' | 'bus',
-    toType: 'top' | 'bottom' | 'bus',
+    fromType: TerminalId['terminalType'],
+    toType: TerminalId['terminalType'],
     laneIndex: number,
     railIndex: number
   ): { pathD: string; deletePos: { x: number; y: number } } => {
     // Відстань між паралельними проводами: при товщині 4px крок 6px дає рівно 2px вільного простору
     const laneOffset = laneIndex * 6;
 
-    // 1. Обидва кінці на нижніх клемах модулів (bottom -> bottom)
-    if (fromType === 'bottom' && toType === 'bottom') {
+    const fromIsTop = isTopTerminal(fromType);
+    const toIsTop = isTopTerminal(toType);
+
+    // 1. Обидва кінці виходять вниз (bottom / cm3 / cm4)
+    if (!fromIsTop && !toIsTop) {
       let laneY = Math.max(fromPos.y, toPos.y) + 17 + laneOffset;
 
       // Обмежуємо висоту: провід повинен строго проходити НАД написами "Модуль 1 - Модуль 12"
@@ -688,8 +746,8 @@ export const DinRailCanvas: React.FC<DinRailCanvasProps> = ({
       return { pathD, deletePos };
     }
 
-    // 2. Обидва кінці на верхніх клемах модулів (top -> top)
-    if (fromType === 'top' && toType === 'top') {
+    // 2. Обидва кінці виходять вгору (top / cm1 / cm2)
+    if (fromIsTop && toIsTop) {
       const laneY = Math.min(fromPos.y, toPos.y) - 17 - laneOffset;
       const pathD = `M ${fromPos.x} ${fromPos.y} L ${fromPos.x} ${laneY} L ${toPos.x} ${laneY} L ${toPos.x} ${toPos.y}`;
       const deletePos = {
@@ -701,8 +759,8 @@ export const DinRailCanvas: React.FC<DinRailCanvasProps> = ({
 
     // 3. З'єднання верх-низ (наприклад між сусідніми рейками або в прямому режимі)
     if (
-      (fromType === 'bottom' && toType === 'top') ||
-      (fromType === 'top' && toType === 'bottom')
+      (!fromIsTop && toIsTop) ||
+      (fromIsTop && !toIsTop)
     ) {
       const upperY = Math.min(fromPos.y, toPos.y);
       const lowerY = Math.max(fromPos.y, toPos.y);
@@ -725,7 +783,7 @@ export const DinRailCanvas: React.FC<DinRailCanvasProps> = ({
         const midX = (fromPos.x + toPos.x) / 2;
 
         const pathD =
-          fromType === 'bottom'
+          !fromIsTop
             ? `M ${fromPos.x} ${fromPos.y} L ${fromPos.x} ${yBot} L ${midX} ${yBot} L ${midX} ${yTop} L ${toPos.x} ${yTop} L ${toPos.x} ${toPos.y}`
             : `M ${fromPos.x} ${fromPos.y} L ${fromPos.x} ${yTop} L ${midX} ${yTop} L ${midX} ${yBot} L ${toPos.x} ${yBot} L ${toPos.x} ${toPos.y}`;
 
@@ -1282,10 +1340,10 @@ export const DinRailCanvas: React.FC<DinRailCanvasProps> = ({
                   const minX = Math.min(c1.x, c2.x);
                   const maxX = Math.max(c1.x, c2.x);
 
-                  if (w.from.terminalType === 'bottom' && w.to.terminalType === 'bottom') {
+                  if (isBottomTerminal(w.from.terminalType) && isBottomTerminal(w.to.terminalType)) {
                     if (!railBottomWiresMap.has(r1)) railBottomWiresMap.set(r1, []);
                     railBottomWiresMap.get(r1)!.push({ id: w.id, minX, maxX });
-                  } else if (w.from.terminalType === 'top' && w.to.terminalType === 'top') {
+                  } else if (isTopTerminal(w.from.terminalType) && isTopTerminal(w.to.terminalType)) {
                     if (!railTopWiresMap.has(r1)) railTopWiresMap.set(r1, []);
                     railTopWiresMap.get(r1)!.push({ id: w.id, minX, maxX });
                   }
@@ -1328,9 +1386,9 @@ export const DinRailCanvas: React.FC<DinRailCanvasProps> = ({
                   const railIdx = getTerminalRail(wire.from);
 
                   const lane =
-                    wire.from.terminalType === 'bottom' && wire.to.terminalType === 'bottom'
+                    isBottomTerminal(wire.from.terminalType) && isBottomTerminal(wire.to.terminalType)
                       ? bottomLaneMap.get(wire.id) ?? 0
-                      : wire.from.terminalType === 'top' && wire.to.terminalType === 'top'
+                      : isTopTerminal(wire.from.terminalType) && isTopTerminal(wire.to.terminalType)
                       ? topLaneMap.get(wire.id) ?? 0
                       : wireIdx % 3;
 
@@ -1525,7 +1583,7 @@ export const DinRailCanvas: React.FC<DinRailCanvasProps> = ({
                   const startY = activeStartCoords.y;
 
                   const exitY =
-                    activeTerminal.terminalType === 'top'
+                    isTopTerminal(activeTerminal.terminalType)
                       ? startY - V_MIN
                       : startY + V_MIN;
 

@@ -42,6 +42,7 @@ export interface CatalogDevice {
   description: string;
   color: string;
   defaultLabel: string;
+  crossModuleTerminalsPerRow?: 4 | 7 | 8 | 11;
 }
 
 export interface PlacedModule {
@@ -57,6 +58,7 @@ export interface PlacedModule {
   railIndex: number;
   position: number;
   manufacturerOverrides?: Partial<Record<ManufacturerId, DeviceProductOverride>>;
+  crossModuleTerminalsPerRow?: 4 | 7 | 8 | 11;
 }
 
 export type ManufacturerId = 'hager' | 'schneider' | 'abb' | 'eaton' | 'iek' | 'eti';
@@ -88,9 +90,11 @@ export interface EnclosureProduct {
 
 export type WireColor = 'gray' | 'black' | 'red' | 'blue' | 'yellow_green';
 
+export type TerminalType = 'top' | 'bottom' | 'bus' | 'cm1' | 'cm2' | 'cm3' | 'cm4';
+
 export interface TerminalId {
   moduleId: string;
-  terminalType: 'top' | 'bottom' | 'bus';
+  terminalType: TerminalType;
   poleIndex: number;
 }
 

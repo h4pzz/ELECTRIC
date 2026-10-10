@@ -198,6 +198,7 @@ export const App: React.FC = () => {
         phase: 'L1',
         railIndex: railIdx,
         position: insertIdx,
+        crossModuleTerminalsPerRow: device.crossModuleTerminalsPerRow,
       };
 
       railModules.splice(insertIdx, 0, newModule);
