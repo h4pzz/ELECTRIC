@@ -1,4 +1,6 @@
 import { Zap, RotateCcw, Sparkles, Printer, Tag, FileText } from 'lucide-react';
+import { GoogleAuth } from './GoogleAuth';
+import type { GoogleUserProfile } from '../types/auth';
 
 interface HeaderProps {
   onReset: () => void;
@@ -8,6 +10,7 @@ interface HeaderProps {
   onPrintScheme: () => void;
   totalModulesPlaced: number;
   totalCapacity: number;
+  onUserChange?: (user: GoogleUserProfile | null) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -18,6 +21,7 @@ export const Header: React.FC<HeaderProps> = ({
   onPrintScheme,
   totalModulesPlaced,
   totalCapacity,
+  onUserChange,
 }) => {
   return (
     <header className="no-print border-b border-slate-200 bg-white/95 backdrop-blur px-4 py-3 sticky top-0 z-30 shadow-xs">
@@ -57,7 +61,7 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Action Buttons */}
+        {/* Action Buttons & Profile */}
         <div className="flex items-center gap-2">
           <button
             onClick={onLoadPreset}
@@ -103,6 +107,12 @@ export const Header: React.FC<HeaderProps> = ({
             <Printer className="w-3.5 h-3.5" />
             <span>Друк</span>
           </button>
+
+          {/* Розділювач */}
+          <div className="h-6 w-px bg-slate-200 mx-1 hidden sm:block" />
+
+          {/* Google Авторизація / Профіль */}
+          <GoogleAuth onUserChange={onUserChange} />
         </div>
       </div>
     </header>
