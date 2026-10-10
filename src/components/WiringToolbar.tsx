@@ -1,6 +1,6 @@
 import React from 'react';
 import type { WireColor, TerminalId } from '../types/electric';
-import { Cable, X, Trash2, Eye, EyeOff, RotateCcw } from 'lucide-react';
+import { Cable, X, Trash2, Eye, EyeOff, RotateCcw, Route } from 'lucide-react';
 
 interface WiringToolbarProps {
   selectedColor: WireColor;
@@ -12,6 +12,8 @@ interface WiringToolbarProps {
   onToggleShowWires: () => void;
   onClearWires: () => void;
   onUndoWire: () => void;
+  routingMode?: 'side' | 'direct';
+  onToggleRoutingMode?: () => void;
 }
 
 export const WIRE_COLOR_CONFIG: Record<
@@ -24,7 +26,7 @@ export const WIRE_COLOR_CONFIG: Record<
     hex: '#1e293b',
     bgClass: 'bg-slate-900 text-white',
     borderClass: 'border-slate-800',
-    role: 'Фаза L1',
+    role: 'L1',
   },
   gray: {
     label: 'Сірий',
@@ -32,7 +34,7 @@ export const WIRE_COLOR_CONFIG: Record<
     hex: '#94a3b8',
     bgClass: 'bg-slate-200 text-slate-800',
     borderClass: 'border-slate-300',
-    role: 'Фаза L2',
+    role: 'L2',
   },
   red: {
     label: 'Червоний',
@@ -40,7 +42,7 @@ export const WIRE_COLOR_CONFIG: Record<
     hex: '#ef4444',
     bgClass: 'bg-red-600 text-white',
     borderClass: 'border-red-600',
-    role: 'Фаза L3',
+    role: 'L3',
   },
   blue: {
     label: 'Синій',
@@ -48,7 +50,7 @@ export const WIRE_COLOR_CONFIG: Record<
     hex: '#3b82f6',
     bgClass: 'bg-blue-600 text-white',
     borderClass: 'border-blue-600',
-    role: 'Нуль (N)',
+    role: 'N',
   },
   yellow_green: {
     label: 'Жовто-зелений',
@@ -56,7 +58,7 @@ export const WIRE_COLOR_CONFIG: Record<
     hex: '#eab308',
     bgClass: 'bg-gradient-to-r from-yellow-400 to-green-500 text-slate-950 font-black',
     borderClass: 'border-yellow-400',
-    role: 'Земля (PE)',
+    role: 'PE',
   },
 };
 
@@ -70,119 +72,138 @@ export const WiringToolbar: React.FC<WiringToolbarProps> = ({
   onToggleShowWires,
   onClearWires,
   onUndoWire,
+  routingMode = 'side',
+  onToggleRoutingMode,
 }) => {
   return (
-    <div className="bg-slate-100 border-b border-slate-200 px-4 py-2.5 shadow-xs">
-      <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
-        
-        {/* Left Side: Wire Controls & Prompt/Status */}
-        <div className="flex items-center gap-3 flex-wrap">
-          {/* Wire Controls */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-mono text-slate-700 px-2 py-1 bg-white rounded border border-slate-200">
-              Дротів: <strong className="text-amber-600 font-bold">{wiresCount}</strong>
-            </span>
+    <div className="flex flex-col gap-1.5 shrink-0">
+      {/* Заголовок блоку Проводка (h-5) */}
+      <div className="h-5 flex items-center justify-between gap-2">
+        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5 whitespace-nowrap">
+          <Cable className="w-3.5 h-3.5 text-amber-500" />
+          Проводка
+        </label>
 
+        {activeTerminal && (
+          <div className="flex items-center gap-1.5 px-2 py-0.5 bg-amber-100 border border-amber-300 rounded-md animate-pulse text-[11px] font-bold text-amber-900 shadow-2xs">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping shrink-0" />
+            <span className="truncate max-w-[170px] sm:max-w-none">
+              Клему обрано. Клікніть 2-гу!
+            </span>
             <button
               type="button"
-              onClick={onToggleShowWires}
-              className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 cursor-pointer shadow-xs"
-              title={showWires ? 'Сховати проводку' : 'Показати проводку'}
+              onClick={onCancelActiveTerminal}
+              className="p-0.5 rounded hover:bg-amber-200 text-amber-800 cursor-pointer ml-0.5"
+              title="Скасувати вибір клеми"
             >
-              {showWires ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-              <span className="hidden sm:inline">{showWires ? 'Сховати' : 'Показати'}</span>
+              <X className="w-3 h-3" />
             </button>
+          </div>
+        )}
+      </div>
 
-            {wiresCount > 0 && (
-              <>
-                <button
-                  type="button"
-                  onClick={onUndoWire}
-                  className="flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 cursor-pointer shadow-xs"
-                  title="Скасувати останній провід"
-                >
-                  <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
-                  <span className="hidden sm:inline">Назад</span>
-                </button>
+      {/* Дворівневий контейнер (висота h-[56px]): кольори зверху, опції під ними */}
+      <div className="flex flex-col gap-1 h-[56px] justify-between">
+        {/* 1. Верхній рядок: Кольори */}
+        <div className="flex items-center gap-1 bg-slate-50 p-0.5 rounded-lg border border-slate-200 h-[26px] w-fit">
+          {(Object.keys(WIRE_COLOR_CONFIG) as WireColor[]).map((cKey) => {
+            const cfg = WIRE_COLOR_CONFIG[cKey];
+            const isSelected = selectedColor === cKey;
 
-                <button
-                  type="button"
-                  onClick={onClearWires}
-                  className="flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 cursor-pointer shadow-xs"
-                  title="Очистити всі проводи"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Очистити</span>
-                </button>
-              </>
-            )}
+            return (
+              <button
+                key={cKey}
+                type="button"
+                onClick={() => onSelectColor(cKey)}
+                className={`h-5 px-1.5 text-[11px] rounded flex items-center gap-1 transition-all cursor-pointer ${
+                  cfg.bgClass
+                } ${
+                  isSelected
+                    ? 'ring-2 ring-amber-500 shadow-xs scale-105 font-black'
+                    : 'opacity-85 hover:opacity-100 font-semibold'
+                }`}
+                title={cfg.name}
+              >
+                <span
+                  className="w-1.5 h-1.5 rounded-full border border-black/20 shadow-inner shrink-0"
+                  style={{
+                    background:
+                      cKey === 'yellow_green'
+                        ? 'repeating-linear-gradient(45deg, #eab308, #eab308 2px, #22c55e 2px, #22c55e 4px)'
+                        : cfg.hex,
+                  }}
+                />
+                <span className="text-[10px] leading-none">{cfg.role}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* 2. Нижній рядок (під кольорами): Канал збоку, дротів, сховати */}
+        <div className="flex items-center gap-1.5 h-[26px] flex-nowrap">
+          {/* Трасування: Канал збоку / Під модулями */}
+          {onToggleRoutingMode && (
+            <button
+              type="button"
+              onClick={onToggleRoutingMode}
+              className={`h-full flex items-center gap-1 px-2 text-[11px] font-bold rounded-lg border transition-all cursor-pointer shadow-xs whitespace-nowrap ${
+                routingMode === 'side'
+                  ? 'bg-amber-100/80 hover:bg-amber-100 text-amber-900 border-amber-300'
+                  : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+              }`}
+              title={
+                routingMode === 'side'
+                  ? 'Трасування: через бічні кабель-канали'
+                  : 'Трасування: прямо під модулями'
+              }
+            >
+              <Route className="w-3 h-3 text-amber-600 stroke-[2.5]" />
+              <span>{routingMode === 'side' ? 'Канал збоку' : 'Під модулями'}</span>
+            </button>
+          )}
+
+          {/* Кількість дротів */}
+          <div className="h-full flex items-center px-2 text-[11px] font-medium text-slate-700 bg-slate-50 rounded-lg border border-slate-200 shadow-xs whitespace-nowrap">
+            <span>Дротів:&nbsp;</span>
+            <strong className="text-amber-600 font-bold">{wiresCount}</strong>
           </div>
 
-          {/* Active wiring prompt state */}
-          {activeTerminal ? (
-            <div className="flex items-center gap-2 px-3 py-1 bg-amber-100 border border-amber-300 rounded-lg animate-pulse text-xs text-amber-900">
-              <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
-              <span>
-                Клему обрано ({activeTerminal.terminalType === 'top' ? 'верхня' : activeTerminal.terminalType === 'bottom' ? 'нижня' : 'шина'}).{' '}
-                <strong>Клікніть другу клему для з'єднання!</strong>
-              </span>
+          {/* Сховати / Показати дроти */}
+          <button
+            type="button"
+            onClick={onToggleShowWires}
+            className="h-full flex items-center gap-1 px-2 text-[11px] font-semibold rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 hover:border-slate-300 cursor-pointer shadow-xs transition whitespace-nowrap"
+            title={showWires ? 'Сховати проводку' : 'Показати проводку'}
+          >
+            {showWires ? <EyeOff className="w-3 h-3 text-slate-500" /> : <Eye className="w-3 h-3 text-slate-500" />}
+            <span>{showWires ? 'Сховати' : 'Показати'}</span>
+          </button>
+
+          {/* Скасувати та Очистити дроти */}
+          {wiresCount > 0 && (
+            <>
               <button
                 type="button"
-                onClick={onCancelActiveTerminal}
-                className="ml-2 p-0.5 rounded bg-white hover:bg-slate-200 text-slate-700 cursor-pointer border border-slate-300"
-                title="Скасувати"
+                onClick={onUndoWire}
+                className="h-full flex items-center gap-1 px-1.5 text-[11px] font-semibold rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 hover:border-slate-300 cursor-pointer shadow-xs transition whitespace-nowrap"
+                title="Скасувати останній провід"
               >
-                <X className="w-3.5 h-3.5" />
+                <RotateCcw className="w-3 h-3 text-slate-400" />
+                <span>Назад</span>
               </button>
-            </div>
-          ) : (
-            <div className="hidden lg:flex items-center gap-1.5 text-xs text-slate-600 bg-white px-2.5 py-1 rounded-lg border border-slate-200">
-              <span>💡 Клікніть на будь-яку <strong>клему</strong> модуля, щоб прокласти провід</span>
-            </div>
+
+              <button
+                type="button"
+                onClick={onClearWires}
+                className="h-full flex items-center gap-1 px-1.5 text-[11px] font-semibold rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 cursor-pointer shadow-xs transition whitespace-nowrap"
+                title="Очистити всі проводи"
+              >
+                <Trash2 className="w-3 h-3" />
+                <span>Очистити</span>
+              </button>
+            </>
           )}
         </div>
-
-        {/* Right Side: Colors selector */}
-        <div className="flex items-center gap-2 flex-wrap ml-auto justify-end">
-          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 mr-1">
-            <Cable className="w-4 h-4 text-amber-500" />
-            <span>Колір проводу:</span>
-          </div>
-
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {(Object.keys(WIRE_COLOR_CONFIG) as WireColor[]).map((cKey) => {
-              const cfg = WIRE_COLOR_CONFIG[cKey];
-              const isSelected = selectedColor === cKey;
-
-              return (
-                <button
-                  key={cKey}
-                  type="button"
-                  onClick={() => onSelectColor(cKey)}
-                  className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-lg border-2 transition-all cursor-pointer shadow-xs ${
-                    cfg.bgClass
-                  } ${isSelected ? 'ring-2 ring-amber-500 scale-105 font-bold shadow-md' : 'opacity-85 hover:opacity-100 hover:scale-102'} ${
-                    cfg.borderClass
-                  }`}
-                  title={cfg.name}
-                >
-                  <span
-                    className="w-2.5 h-2.5 rounded-full border border-black/20 shadow-inner"
-                    style={{
-                      background:
-                        cKey === 'yellow_green'
-                          ? 'repeating-linear-gradient(45deg, #eab308, #eab308 3px, #22c55e 3px, #22c55e 6px)'
-                          : cfg.hex,
-                    }}
-                  />
-                  <span>{cfg.label}</span>
-                  <span className="text-[10px] opacity-80 font-mono">({cfg.role})</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
       </div>
     </div>
   );

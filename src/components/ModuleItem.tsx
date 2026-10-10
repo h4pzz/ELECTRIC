@@ -378,67 +378,61 @@ export const ModuleItem: React.FC<ModuleItemProps> = ({
         </div>
       ) : (
         /* Main Body для класичних модулів */
-        <div data-module-body="true" className="flex-1 min-h-0 overflow-hidden flex flex-col justify-center items-center text-center px-1 py-0.5">
-          {/* Phase Pill */}
-          {module.phase && (
-            <span
-              className={`text-[9px] font-bold px-1.5 py-0.2 rounded font-mono mb-0.5 ${
-                module.phase === 'L1'
-                  ? 'bg-amber-100 text-amber-800 border border-amber-300'
-                  : module.phase === 'L2'
-                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                  : module.phase === 'L3'
-                  ? 'bg-red-100 text-red-800 border border-red-300'
-                  : 'bg-indigo-100 text-indigo-800 border border-indigo-300'
-              }`}
-            >
-              {module.phase}
-            </span>
-          )}
+        <div data-module-body="true" className="flex-1 min-h-0 overflow-hidden flex flex-col justify-between items-center text-center px-1 py-1 w-full">
+          {/* Верхній ряд: Фаза (якщо є) або категорія */}
+          <div className="flex items-center justify-center gap-1 w-full">
+            {module.phase ? (
+              <span
+                className={`text-[9.5px] font-black px-2 py-0.5 rounded font-mono shadow-2xs ${
+                  module.phase === 'L1'
+                    ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                    : module.phase === 'L2'
+                    ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                    : module.phase === 'L3'
+                    ? 'bg-red-100 text-red-900 border border-red-300'
+                    : 'bg-indigo-100 text-indigo-900 border border-indigo-300'
+                }`}
+                title={`Фаза: ${module.phase}`}
+              >
+                {module.phase}
+              </span>
+            ) : (
+              <span className="text-[8.5px] font-mono font-bold text-slate-400 uppercase">
+                {module.category === 'rcd' ? 'ПЗВ' : module.category === 'rcbo' ? 'ДИФ' : `${module.poles}P`}
+              </span>
+            )}
 
-          {/* User Label (circuit name) */}
-          <div
-            onClick={() => onEdit(module)}
-            className="text-[11px] font-bold text-slate-900 leading-tight line-clamp-2 px-1 py-0.5 rounded hover:bg-amber-100/80 cursor-pointer w-full text-center"
-            title={`Клікніть для редагування: ${module.label}`}
-          >
-            {module.label || module.name}
-          </div>
-
-          {/* Rating or Specific Hardware Simulation */}
-          {isVoltageRelay ? (
-            <div className="my-1 px-1.5 py-0.5 bg-slate-950 rounded border border-slate-800 text-red-500 font-mono font-bold text-xs tracking-wider shadow-inner flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-              230 V
-            </div>
-          ) : (
-            <div className="font-mono font-black text-xs text-slate-900 my-0.5 bg-white/70 px-1 rounded border border-slate-200">
-              {module.rating}
-            </div>
-          )}
-
-          {/* Physical Breaker Toggle & Test Button Simulation */}
-          <div className="flex items-center justify-center gap-1.5 mt-0.5">
-            {/* Test Button for RCD */}
+            {/* Тестова кнопка тільки для ПЗВ / Дифавтомата поруч з фазою */}
             {isRcd && (
               <div
-                className="w-4 h-4 rounded bg-amber-400 border border-amber-600 text-[8px] font-black text-amber-950 flex items-center justify-center shadow-xs cursor-pointer hover:bg-amber-300"
-                title="Кнопка Тест ПЗВ"
+                className="w-3.5 h-3.5 rounded bg-amber-400 border border-amber-600 text-[7.5px] font-black text-amber-950 flex items-center justify-center shadow-2xs"
+                title="Кнопка Тест ПЗВ [T]"
               >
                 T
               </div>
             )}
+          </div>
 
-            {/* 1-0-2 Changeover Switch Lever */}
-            {isSwitch ? (
+          {/* Центральний блок: Назва лінії / Призначення (User Label) */}
+          <div
+            onClick={() => onEdit(module)}
+            className="text-[11.5px] font-extrabold text-slate-900 leading-snug line-clamp-2 px-1 py-1 rounded hover:bg-amber-100/90 cursor-pointer w-full text-center transition-colors"
+            title={`Клікніть для редагування: ${module.label || module.name}`}
+          >
+            {module.label || module.name}
+          </div>
+
+          {/* Нижній блок: Характеристика та номінал (наприклад B16, C25, 40A 30mA) */}
+          <div className="w-full flex items-center justify-center">
+            {isVoltageRelay ? (
+              <div className="px-2 py-0.5 bg-slate-950 rounded border border-slate-800 text-red-500 font-mono font-bold text-[11px] tracking-wider shadow-inner flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                230 V
+              </div>
+            ) : isSwitch ? (
               <div className="flex flex-col items-center gap-0.5">
-                <div className="flex items-center gap-1.5 bg-slate-900/90 px-2 py-0.5 rounded border border-slate-700 shadow-inner">
-                  <span className="text-[9px] font-mono font-bold text-amber-400">I</span>
-                  <div className="h-5 bg-gradient-to-b from-slate-700 to-slate-900 rounded-xs border border-slate-950 flex flex-col justify-center items-center shadow px-1.5 min-w-[20px]">
-                    <div className="w-full h-1.5 bg-orange-500 rounded-2xs" />
-                  </div>
-                  <span className="text-[9px] font-mono font-bold text-slate-400">0</span>
-                  <span className="text-[9px] font-mono font-bold text-amber-400">II</span>
+                <div className="font-mono font-black text-[11px] text-orange-950 bg-orange-100 px-2 py-0.5 rounded border border-orange-300">
+                  {module.rating}
                 </div>
                 <span className="text-[7.5px] font-mono text-slate-500 font-semibold leading-tight">
                   {module.poles === 1
@@ -446,16 +440,9 @@ export const ModuleItem: React.FC<ModuleItemProps> = ({
                     : `2×${module.poles} входів / ${module.poles} вих`}
                 </span>
               </div>
-            ) : !isBlank && (
-              <div className="flex gap-1">
-                {Array.from({ length: module.poles }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="w-3.5 h-5 bg-gradient-to-b from-slate-800 to-slate-900 rounded-sm border border-slate-950 flex flex-col justify-start items-center p-0.5 shadow"
-                  >
-                    <div className="w-2.5 h-1.5 bg-emerald-500 rounded-2xs" title="ON" />
-                  </div>
-                ))}
+            ) : (
+              <div className="font-mono font-black text-xs text-slate-950 bg-slate-100/90 hover:bg-white px-2 py-0.5 rounded-md border border-slate-300 shadow-2xs">
+                {module.rating}
               </div>
             )}
           </div>

@@ -114,3 +114,19 @@ export interface BusBar {
   terminalsCount: number;
 }
 
+export interface SavedSwitchboard {
+  id: string;
+  userId?: string;
+  name: string;
+  createdAt: number;
+  updatedAt: number;
+  config: EnclosureConfig;
+  modules: PlacedModule[];
+  manufacturerId: ManufacturerId;
+  busBars: BusBar[];
+  wires: WireConnection[];
+  totalModules: number;
+  totalCapacity: number;
+}
+
+

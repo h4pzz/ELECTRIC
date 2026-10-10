@@ -9,7 +9,9 @@ import type {
   WireConnection,
   BusBar,
   BusBarType,
+  SavedSwitchboard,
 } from './types/electric';
+import type { GoogleUserProfile } from './types/auth';
 
 import { Header } from './components/Header';
 import { EnclosureConfigBar } from './components/EnclosureConfigBar';
@@ -20,6 +22,7 @@ import { ManufacturerSelector } from './components/ManufacturerSelector';
 import { SpecificationTable } from './components/SpecificationTable';
 import { EditModuleModal } from './components/EditModuleModal';
 import { LabelSheetModal } from './components/LabelSheetModal';
+import { SaveSwitchboardModal } from './components/SaveSwitchboardModal';
 import { APARTMENT_PRESET_MODULES, APARTMENT_PRESET_WIRES } from './data/presets';
 
 const STORAGE_KEY_CONFIG = 'electrobox_config_v1';
@@ -27,6 +30,7 @@ const STORAGE_KEY_MODULES = 'electrobox_modules_v1';
 const STORAGE_KEY_MFR = 'electrobox_mfr_v1';
 const STORAGE_KEY_WIRES = 'electrobox_wires_v1';
 const STORAGE_KEY_BUSBARS = 'electrobox_busbars_v1';
+const STORAGE_KEY_SAVED_SWITCHBOARDS = 'electrobox_saved_switchboards_v1';
 
 export const App: React.FC = () => {
   // 1. Стан конфігурації щитка
@@ -101,6 +105,7 @@ export const App: React.FC = () => {
   const [selectedWireColor, setSelectedWireColor] = useState<WireColor>('blue');
   const [activeTerminal, setActiveTerminal] = useState<TerminalId | null>(null);
   const [showWires, setShowWires] = useState<boolean>(true);
+  const [routingMode, setRoutingMode] = useState<'side' | 'direct'>('side');
 
   // Модальні вікна
   const [editingModule, setEditingModule] = useState<PlacedModule | null>(null);
@@ -132,6 +137,97 @@ export const App: React.FC = () => {
   const totalCapacity = Array.from({ length: config.rows }).reduce<number>((sum, _, r) => {
     return sum + config.modulesPerRow + (config.railExtraModules?.[r] ?? 0);
   }, 0);
+
+  // Користувач Google та збережені щитки в акаунті
+  const [user, setUser] = useState<GoogleUserProfile | null>(() => {
+    try {
+      const raw = localStorage.getItem('electrobox_user_v1');
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [savedSwitchboards, setSavedSwitchboards] = useState<SavedSwitchboard[]>(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY_SAVED_SWITCHBOARDS);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 3500);
+  };
+
+  const handleSaveSwitchboard = (name: string) => {
+    const newSaved: SavedSwitchboard = {
+      id: `sw-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      userId: user?.sub,
+      name,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      config: JSON.parse(JSON.stringify(config)),
+      modules: JSON.parse(JSON.stringify(modules)),
+      manufacturerId,
+      busBars: JSON.parse(JSON.stringify(busBars)),
+      wires: JSON.parse(JSON.stringify(wires)),
+      totalModules: totalModulesPlaced,
+      totalCapacity,
+    };
+
+    setSavedSwitchboards((prev) => {
+      const updated = [newSaved, ...prev];
+      try {
+        localStorage.setItem(STORAGE_KEY_SAVED_SWITCHBOARDS, JSON.stringify(updated));
+      } catch (e) {
+        console.warn('Помилка запису в localStorage:', e);
+      }
+      return updated;
+    });
+
+    showToast(`✓ Щиток «${name}» збережено в акаунт!`);
+  };
+
+  const handleLoadSwitchboard = (sw: SavedSwitchboard) => {
+    setConfig(sw.config);
+    setModules(sw.modules);
+    setManufacturerId(sw.manufacturerId);
+    setBusBars(sw.busBars);
+    setWires(sw.wires);
+    showToast(`✓ Завантажено щиток «${sw.name}»`);
+  };
+
+  const handleDeleteSwitchboard = (id: string) => {
+    setSavedSwitchboards((prev) => {
+      const updated = prev.filter((item) => item.id !== id);
+      try {
+        localStorage.setItem(STORAGE_KEY_SAVED_SWITCHBOARDS, JSON.stringify(updated));
+      } catch (e) {
+        console.warn('Помилка запису в localStorage:', e);
+      }
+      return updated;
+    });
+    showToast('Щиток видалено зі збережених');
+  };
+
+  const handleClearAllModules = () => {
+    setModules([]);
+    setWires([]);
+    showToast('Усі модулі успішно видалено зі щитка');
+  };
+
+  const userSavedSwitchboards = React.useMemo(() => {
+    if (!user) return savedSwitchboards;
+    return savedSwitchboards.filter((sw) => !sw.userId || sw.userId === user.sub);
+  }, [savedSwitchboards, user]);
 
   // Зміна додаткових модулів рейки (+1 або -1, розширення пластрона)
   const handleUpdateRailExtraModules = (railIndex: number, delta: number) => {
@@ -519,29 +615,32 @@ export const App: React.FC = () => {
         onPrintScheme={() => window.print()}
         totalModulesPlaced={totalModulesPlaced}
         totalCapacity={totalCapacity}
+        onUserChange={setUser}
+        savedSwitchboards={userSavedSwitchboards}
+        onLoadSwitchboard={handleLoadSwitchboard}
+        onDeleteSwitchboard={handleDeleteSwitchboard}
       />
 
-      {/* 2. Вибір типу щитка: Зовнішній/Внутрішній, ряди, модулі */}
+      {/* 2. Вибір типу щитка та панель управління проводкою */}
       <div className="no-print">
         <EnclosureConfigBar
           config={config}
           onChange={(updates) => setConfig((prev) => ({ ...prev, ...updates }))}
-        />
-      </div>
-
-      {/* 3. Панель управління проводкою та кольорами */}
-      <div className="no-print">
-        <WiringToolbar
-          selectedColor={selectedWireColor}
-          onSelectColor={setSelectedWireColor}
-          activeTerminal={activeTerminal}
-          onCancelActiveTerminal={() => setActiveTerminal(null)}
-          wiresCount={wires.length}
-          showWires={showWires}
-          onToggleShowWires={() => setShowWires((prev) => !prev)}
-          onClearWires={handleClearWires}
-          onUndoWire={handleUndoWire}
-        />
+        >
+          <WiringToolbar
+            selectedColor={selectedWireColor}
+            onSelectColor={setSelectedWireColor}
+            activeTerminal={activeTerminal}
+            onCancelActiveTerminal={() => setActiveTerminal(null)}
+            wiresCount={wires.length}
+            showWires={showWires}
+            onToggleShowWires={() => setShowWires((prev) => !prev)}
+            onClearWires={handleClearWires}
+            onUndoWire={handleUndoWire}
+            routingMode={routingMode}
+            onToggleRoutingMode={() => setRoutingMode((m) => (m === 'side' ? 'direct' : 'side'))}
+          />
+        </EnclosureConfigBar>
       </div>
 
       {/* 4. Головна робоча зона: Сайдбар модулів зліва + Холст з DIN-рейками */}
@@ -572,6 +671,7 @@ export const App: React.FC = () => {
             activeTerminal={activeTerminal}
             onTerminalClick={handleTerminalClick}
             showWires={showWires}
+            routingMode={routingMode}
             // Bus bars
             busBars={busBars}
             onAddBusBar={handleAddBusBar}
@@ -579,6 +679,8 @@ export const App: React.FC = () => {
             onUpdateBusBar={handleUpdateBusBar}
             // Rail capacity extension (+1 module)
             onUpdateRailExtraModules={handleUpdateRailExtraModules}
+            onSaveSwitchboard={() => setIsSaveModalOpen(true)}
+            onClearModules={handleClearAllModules}
           />
         </div>
       </div>
@@ -619,6 +721,24 @@ export const App: React.FC = () => {
         config={config}
         modules={modules}
       />
+
+      {/* Модальне вікно збереження щитка */}
+      <SaveSwitchboardModal
+        isOpen={isSaveModalOpen}
+        onClose={() => setIsSaveModalOpen(false)}
+        onSave={handleSaveSwitchboard}
+        user={user}
+        config={config}
+        totalModules={totalModulesPlaced}
+        totalCapacity={totalCapacity}
+      />
+
+      {/* Спливаюче сповіщення (Toast) */}
+      {toastMessage && (
+        <div className="fixed bottom-5 right-5 z-50 flex items-center gap-2 bg-slate-900/95 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-2xl border border-slate-700 animate-in fade-in slide-in-from-bottom-2 duration-150 backdrop-blur-xs">
+          <span>{toastMessage}</span>
+        </div>
+      )}
 
     </div>
   );

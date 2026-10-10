@@ -10,7 +10,7 @@ import type {
   BusBarType,
 } from '../types/electric';
 import { ModuleItem } from './ModuleItem';
-import { AlertCircle, Plus, Minus, Trash2, Edit2, Route, Printer } from 'lucide-react';
+import { AlertCircle, Plus, Minus, Trash2, Edit2, Printer, Bookmark, RotateCcw } from 'lucide-react';
 
 import { WIRE_COLOR_CONFIG } from './WiringToolbar';
 
@@ -37,6 +37,9 @@ interface DinRailCanvasProps {
   onUpdateBusBar: (busBar: BusBar) => void;
   // Rail extra modules (+1 capacity)
   onUpdateRailExtraModules?: (railIndex: number, delta: number) => void;
+  onSaveSwitchboard?: () => void;
+  onClearModules?: () => void;
+  routingMode?: 'side' | 'direct';
 }
 
 interface Rect {
@@ -282,15 +285,20 @@ export const DinRailCanvas: React.FC<DinRailCanvasProps> = ({
   onAddBusBar,
   onDeleteBusBar,
   onUpdateBusBar,
+  onSaveSwitchboard,
+  onClearModules,
+  routingMode: propRoutingMode,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [isConfirmClearOpen, setIsConfirmClearOpen] = useState(false);
   const [dragOverRail, setDragOverRail] = useState<number | null>(null);
   const [dropIndicator, setDropIndicator] = useState<{ railIndex: number; insertIndex: number } | null>(null);
   const [draggedModuleId, setDraggedModuleId] = useState<string | null>(null);
   const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
   const [hoveredWireId, setHoveredWireId] = useState<string | null>(null);
   const [editingBusBarId, setEditingBusBarId] = useState<string | null>(null);
-  const [routingMode, setRoutingMode] = useState<'side' | 'direct'>('side');
+  const [internalRoutingMode] = useState<'side' | 'direct'>('side');
+  const routingMode = propRoutingMode ?? internalRoutingMode;
   const [containerWidth, setContainerWidth] = useState<number>(800);
   const [isDraggingAny, setIsDraggingAny] = useState(false);
 
@@ -315,6 +323,7 @@ export const DinRailCanvas: React.FC<DinRailCanvasProps> = ({
   // Загальна кількість додаткових розширених модулів
   const totalExtraModules = Object.values(config.railExtraModules || {}).reduce((sum, v) => sum + v, 0);
   const totalCanvasCapacity = config.rows * config.modulesPerRow + totalExtraModules;
+  const totalModulesPlaced = modules.reduce((sum, m) => sum + m.width, 0);
 
   // Обчислення всього електричного кола (проводів, модулів, шин) при наведенні на будь-який провід
   const circuitHighlight = React.useMemo(() => {
@@ -818,69 +827,137 @@ export const DinRailCanvas: React.FC<DinRailCanvasProps> = ({
         {/* Верхня панель корпуса щита (інформація та шини N/PE) */}
         <div className="no-print border-b-2 border-slate-200 pb-3 mb-4 space-y-2.5 px-3 md:px-5">
           
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-3 h-3 rounded-full bg-slate-300 border border-slate-400 shadow-inner" />
-              <div>
-                <span className="text-xs uppercase tracking-widest font-bold text-slate-500">
-                  {config.mountType === 'flush' ? 'Вбудований щит (врізний)' : 'Навісний щит (настінний)'}
+          <div className="flex items-center justify-between gap-3 w-full flex-wrap lg:flex-nowrap">
+            {/* Ліва частина: назва та параметри щитка */}
+            <div className="flex items-center gap-2.5 shrink-0">
+              <div className="w-2.5 h-2.5 rounded-full bg-slate-300 border border-slate-400 shadow-inner shrink-0" />
+              <div className="leading-tight">
+                <span className="text-[11px] uppercase tracking-wider font-bold text-slate-500 block">
+                  {config.mountType === 'flush' ? 'Вбудований щит' : 'Навісний щит'}
                 </span>
-                <h3 className="text-base font-extrabold text-slate-900">
-                  Корпус {config.rows * config.modulesPerRow} модулів {totalExtraModules > 0 ? `(${totalCanvasCapacity} з розширенням +${totalExtraModules})` : `(${config.rows} × ${config.modulesPerRow})`} • {config.ipRating}
+                <h3 className="text-sm sm:text-base font-extrabold text-slate-900 whitespace-nowrap">
+                  Корпус {config.rows * config.modulesPerRow} мод. {totalExtraModules > 0 ? `(+${totalExtraModules})` : `(${config.rows} × ${config.modulesPerRow})`} • {config.ipRating}
                 </h3>
               </div>
             </div>
 
-            {/* Кнопки перемикання режиму трасування, додавання шин N/PE та друку */}
-            <div className="no-print flex flex-wrap items-center gap-2">
+            {/* Права частина: Заповнення, Очистити, Зберегти щиток та Друк строго на одному рівні */}
+            <div className="flex items-center gap-2 sm:gap-2.5 ml-auto shrink-0">
+              {/* Індикатор заповнення */}
+              <div className="flex items-center gap-2 sm:gap-2.5 px-2.5 py-1.5 rounded-lg bg-slate-100 border border-slate-200 text-xs shrink-0">
+                <span className="text-slate-600 font-medium whitespace-nowrap">Заповнення:</span>
+                <span className="font-bold text-slate-800 whitespace-nowrap">
+                  {totalModulesPlaced} / {totalCanvasCapacity} мод.
+                </span>
+                <div className="w-16 sm:w-20 bg-slate-200 h-2 rounded-full overflow-hidden shrink-0">
+                  <div
+                    className={`h-full transition-all duration-300 ${
+                      totalModulesPlaced > totalCanvasCapacity
+                        ? 'bg-rose-500'
+                        : totalModulesPlaced === totalCanvasCapacity
+                        ? 'bg-amber-500'
+                        : 'bg-emerald-500'
+                    }`}
+                    style={{ width: `${Math.min(100, (totalModulesPlaced / (totalCanvasCapacity || 1)) * 100)}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Кнопка Очистити */}
               <button
                 type="button"
-                onClick={() => setRoutingMode((m) => (m === 'side' ? 'direct' : 'side'))}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer shadow-xs border ${
-                  routingMode === 'side'
-                    ? 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300'
-                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
-                }`}
-                title={
-                  routingMode === 'side'
-                    ? 'Трасування: через бічні кабель-канали (не перекриває модулі). Клікніть, щоб перемкнути на проходження під модулями'
-                    : 'Трасування: прямо під модулями. Клікніть, щоб перемкнути на бічні кабель-канали'
-                }
+                onClick={() => setIsConfirmClearOpen(true)}
+                className="no-print flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-rose-50 text-slate-700 hover:text-rose-600 border border-slate-300 hover:border-rose-300 text-xs font-semibold transition cursor-pointer shadow-xs whitespace-nowrap shrink-0 group"
+                title="Очистити всі модулі"
               >
-                <Route className="w-3.5 h-3.5 text-amber-600" />
-                <span>{routingMode === 'side' ? 'Канал збоку' : 'Під модулями'}</span>
+                <RotateCcw className="w-3.5 h-3.5 text-slate-400 group-hover:text-rose-500" />
+                <span>Очистити</span>
               </button>
 
+              {/* Кнопка зберегти щиток */}
               <button
                 type="button"
-                onClick={() => onAddBusBar('n')}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-300 text-xs font-bold transition cursor-pointer shadow-xs"
-                title="Додати додаткову нульову шину N"
+                onClick={onSaveSwitchboard}
+                className="no-print flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition cursor-pointer shadow-xs whitespace-nowrap shrink-0"
+                title="Зберегти щиток в акаунт"
               >
-                <Plus className="w-3.5 h-3.5" />
-                <span>+ Шина N</span>
+                <Bookmark className="w-3.5 h-3.5" />
+                <span>Зберегти щиток</span>
               </button>
 
-              <button
-                type="button"
-                onClick={() => onAddBusBar('pe')}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-yellow-50 hover:bg-yellow-100 text-yellow-800 border border-yellow-300 text-xs font-bold transition cursor-pointer shadow-xs"
-                title="Додати додаткову шину заземлення PE"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>+ Шина PE</span>
-              </button>
-
+              {/* Кнопка друку */}
               <button
                 type="button"
                 onClick={() => window.print()}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition cursor-pointer shadow-xs"
+                className="no-print flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition cursor-pointer shadow-xs whitespace-nowrap shrink-0"
                 title="Роздрукувати схему електричного щитка"
               >
                 <Printer className="w-3.5 h-3.5" />
                 <span>Друк</span>
               </button>
             </div>
+          </div>
+
+          {/* Контекстне модальне вікно підтвердження очищення всіх модулів */}
+          {isConfirmClearOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+              <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl border border-slate-200 p-5 space-y-4 animate-in zoom-in-95 duration-150">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                    <Trash2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-900">Очищення щитка</h4>
+                    <p className="text-xs font-semibold text-rose-600 mt-0.5">Ви впевнені, що хочете видалити всі модулі?</p>
+                  </div>
+                </div>
+                <p className="text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                  Ця дія видалить усі розміщені модулі ({modules.length} шт.) та їхні з'єднання зі щитка.
+                </p>
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setIsConfirmClearOpen(false)}
+                    className="px-3.5 py-2 text-xs font-semibold rounded-xl text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+                  >
+                    Скасувати
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClearModules?.();
+                      setIsConfirmClearOpen(false);
+                    }}
+                    className="px-4 py-2 text-xs font-bold rounded-xl bg-rose-600 hover:bg-rose-500 text-white shadow-md shadow-rose-600/20 transition cursor-pointer"
+                  >
+                    Видалити всі
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Кнопки додавання шин N/PE */}
+          <div className="no-print flex flex-wrap items-center gap-2 pt-0.5">
+            <button
+              type="button"
+              onClick={() => onAddBusBar('n')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-300 text-xs font-bold transition cursor-pointer shadow-xs"
+              title="Додати додаткову нульову шину N"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>+ Шина N</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onAddBusBar('pe')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-yellow-50 hover:bg-yellow-100 text-yellow-800 border border-yellow-300 text-xs font-bold transition cursor-pointer shadow-xs"
+              title="Додати додаткову шину заземлення PE"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>+ Шина PE</span>
+            </button>
           </div>
 
           {/* ============================================================== */}
