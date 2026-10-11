@@ -199,6 +199,43 @@ export const CATALOG_DEVICES: CatalogDevice[] = [
     defaultLabel: 'Перемикач PS-63A',
   },
 
+  // --- Гібридні інвертори та ДБЖ (інтерфейсні DIN-модулі обв'язки) ---
+  {
+    id: 'inverter-1p',
+    name: 'Гібридний інвертор 1Ф (Deye / Victron 5-6 кВт)',
+    category: 'inverter',
+    width: 4,
+    poles: 2,
+    defaultRating: '6.0 кВт (Grid 32A / EPS 32A)',
+    availableRatings: [
+      '5.0 кВт (Deye SUN-5K-SG03LP1)',
+      '6.0 кВт (Deye SUN-6K-SG04LP1)',
+      '5.0 кВА (Victron MultiPlus-II 48/5000)',
+      '3.6 кВт (Axioma / PowMr 24V/48V)',
+      '8.0 кВт (Deye SUN-8K-SG05LP1)',
+    ],
+    description: 'Модульний блок підключення та обв\'язки 1-фазного гібридного інвертора / ДБЖ (4 DIN модулі). Зверху: клеми Grid In (L, N) від мережі. Знизу: клеми Backup EPS Out (L, N) на виділені резервні споживачі або байпас.',
+    color: '#0d9488', // Teal-600
+    defaultLabel: 'Інвертор 1Ф Deye 6kW',
+  },
+  {
+    id: 'inverter-3p',
+    name: 'Гібридний інвертор 3Ф (Deye 10-12 кВт 3P+N)',
+    category: 'inverter',
+    width: 6,
+    poles: 4,
+    defaultRating: '12.0 кВт (3Ф 3x18A EPS)',
+    availableRatings: [
+      '10.0 кВт (Deye SUN-10K-SG04LP3)',
+      '12.0 кВт (Deye SUN-12K-SG04LP3)',
+      '15.0 кВт (Deye SUN-15K-SG01HP3)',
+      '10.0 кВт (Huawei SUN2000-10KTL + BackupBox)',
+    ],
+    description: 'Модульний блок підключення та обв\'язки 3-фазного гібридного інвертора (6 DIN модулів). Зверху: 3-фазний мережевий ввід Grid In (L1, L2, L3, N). Знизу: повноцінний 3-фазний резервований вихід Backup EPS Out (L1, L2, L3, N).',
+    color: '#0f766e', // Teal-700
+    defaultLabel: 'Інвертор 3Ф Deye 12kW',
+  },
+
   // --- Додаткове модульне обладнання ---
   {
     id: 'cross-module-4p',

@@ -66,6 +66,7 @@ export const ModuleItem: React.FC<ModuleItemProps> = ({
   const isRcd = module.category === 'rcd' || module.category === 'rcbo';
   const isVoltageRelay = module.category === 'voltage_relay';
   const isPhaseSelector = module.category === 'phase_selector';
+  const isInverter = module.category === 'inverter';
   const isBlank = module.category === 'blank';
   const isSwitch = module.category === 'switch';
   const isCrossModule = module.category === 'cross_module';
@@ -76,8 +77,9 @@ export const ModuleItem: React.FC<ModuleItemProps> = ({
 
   // Для перемикача 1-0-2: по 2 входи на кожен полюс/модуль зверху (Ввід I та Ввід II) та по 1 виходу знизу
   // Для реле вибору фаз (наприклад ПЕФ-320): 4 входи зверху (L1, L2, L3, N) та 2 виходи знизу (L_вихід, N)
-  const topTerminalsCount = isBlank || isCrossModule ? 0 : isSwitch ? module.poles * 2 : isPhaseSelector ? 4 : module.poles;
-  const bottomTerminalsCount = isBlank || isCrossModule ? 0 : isPhaseSelector ? 2 : module.poles;
+  // Для інвертора: зверху клеми Grid In (2 для 1Ф, 4 для 3Ф), знизу Backup EPS Out (2 для 1Ф, 4 для 3Ф)
+  const topTerminalsCount = isBlank || isCrossModule ? 0 : isSwitch ? module.poles * 2 : isPhaseSelector ? 4 : isInverter ? module.poles : module.poles;
+  const bottomTerminalsCount = isBlank || isCrossModule ? 0 : isPhaseSelector ? 2 : isInverter ? module.poles : module.poles;
 
   const isTerminalActive = (type: TerminalId['terminalType'], poleIdx: number) => {
     return (
@@ -137,6 +139,21 @@ export const ModuleItem: React.FC<ModuleItemProps> = ({
           const oName = outNames[poleIdx] || `Вихід ${poleIdx + 1}`;
           termTitle = `Вихід навантаження ${oName} (обрана фаза). Підключено: ${termWires.length}/2.`;
           termBadge = oName;
+        }
+      } else if (isInverter) {
+        const is3P = module.poles === 4;
+        if (type === 'top') {
+          const pName = is3P
+            ? (poleIdx === 3 ? 'N' : `L${poleIdx + 1}`)
+            : (poleIdx === 0 ? 'L' : 'N');
+          termTitle = `Інвертор Вхід Grid In (${pName}) від мережі. Підключено: ${termWires.length}/2.`;
+          termBadge = `G:${pName}`;
+        } else {
+          const pName = is3P
+            ? (poleIdx === 3 ? 'N' : `L${poleIdx + 1}`)
+            : (poleIdx === 0 ? 'L' : 'N');
+          termTitle = `Інвертор Вихід Backup EPS Out (${pName}) на критичні навантаження. Підключено: ${termWires.length}/2.`;
+          termBadge = `EPS:${pName}`;
         }
       } else {
         termTitle = `Клема ${type === 'top' ? 'входу' : 'виходу'} (Полюс ${poleIdx + 1}). Підключено проводів: ${termWires.length}/2.`;
@@ -478,6 +495,29 @@ export const ModuleItem: React.FC<ModuleItemProps> = ({
               <div className="px-2 py-0.5 bg-slate-950 rounded border border-slate-800 text-red-500 font-mono font-bold text-[11px] tracking-wider shadow-inner flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
                 230 V
+              </div>
+            ) : isInverter ? (
+              <div className="flex flex-col items-center gap-1 w-full px-1">
+                {/* Інтерактивний інверторний дисплей зі статусом Grid, Batt, EPS */}
+                <div className="flex items-center justify-between gap-1 bg-slate-950 px-2 py-1 rounded border border-teal-500/40 shadow-inner w-full max-w-[150px]">
+                  <span className="flex items-center gap-0.5 text-[8px] font-mono font-bold text-sky-400">
+                    <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
+                    GRID
+                  </span>
+                  <span className="text-slate-600 text-[8px]">➔</span>
+                  <span className="flex items-center gap-0.5 text-[8px] font-mono font-bold text-emerald-400">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                    BATT
+                  </span>
+                  <span className="text-slate-600 text-[8px]">➔</span>
+                  <span className="flex items-center gap-0.5 text-[8px] font-mono font-bold text-amber-400">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+                    EPS
+                  </span>
+                </div>
+                <div className="font-mono font-black text-[9.5px] text-teal-950 bg-teal-100 px-2 py-0.5 rounded border border-teal-300 truncate max-w-full shadow-2xs">
+                  {module.rating}
+                </div>
               </div>
             ) : isPhaseSelector ? (
               <div className="flex flex-col items-center gap-1 w-full px-1">

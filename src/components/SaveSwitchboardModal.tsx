@@ -48,7 +48,7 @@ export const SaveSwitchboardModal: React.FC<SaveSwitchboardModalProps> = ({
             <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
               <Bookmark className="w-4 h-4" />
             </div>
-            <h3 className="text-base font-bold text-slate-900">Зберегти щиток</h3>
+            <h3 className="text-base font-bold text-slate-900">Зберегти</h3>
           </div>
           <button
             type="button"

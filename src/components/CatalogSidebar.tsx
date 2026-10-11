@@ -18,6 +18,7 @@ export const CatalogSidebar: React.FC<CatalogSidebarProps> = ({ onAddDevice, row
     { id: 'all', label: 'Всі' },
     { id: 'breaker', label: 'Автомати' },
     { id: 'switch', label: '1-0-2 Резерв' },
+    { id: 'inverter', label: 'Інвертори / ДБЖ' },
     { id: 'phase_selector', label: 'Вибір фаз' },
     { id: 'rcd', label: 'ПЗВ (УЗО)' },
     { id: 'rcbo', label: 'Дифавтомати' },
@@ -35,7 +36,7 @@ export const CatalogSidebar: React.FC<CatalogSidebarProps> = ({ onAddDevice, row
 
     if (activeCategory === 'all') return true;
     if (activeCategory === 'other') {
-      return !['breaker', 'rcd', 'rcbo', 'voltage_relay', 'switch', 'phase_selector'].includes(dev.category);
+      return !['breaker', 'rcd', 'rcbo', 'voltage_relay', 'switch', 'phase_selector', 'inverter'].includes(dev.category);
     }
     return dev.category === activeCategory;
   });
@@ -53,6 +54,8 @@ export const CatalogSidebar: React.FC<CatalogSidebarProps> = ({ onAddDevice, row
         return <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 font-medium">MCB</span>;
       case 'switch':
         return <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-50 text-orange-700 border border-orange-200 font-bold">1-0-2</span>;
+      case 'inverter':
+        return <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-50 text-teal-700 border border-teal-200 font-bold">INV</span>;
       case 'phase_selector':
         return <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-50 text-violet-700 border border-violet-200 font-bold">ПЕФ</span>;
       case 'rcd':

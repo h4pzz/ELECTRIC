@@ -252,7 +252,7 @@ export const GoogleAuth: React.FC<GoogleAuthProps> = ({
               <div className="py-3 px-2 text-center bg-slate-50 rounded-lg border border-dashed border-slate-200">
                 <p className="text-xs text-slate-500 font-medium">Немає збережених щитків</p>
                 <p className="text-[10px] text-slate-400 mt-0.5">
-                  Натисніть кнопку «Зберегти щиток» на панелі щитка
+                  Натисніть кнопку «Зберегти» на панелі
                 </p>
               </div>
             ) : (

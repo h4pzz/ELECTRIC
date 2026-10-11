@@ -339,6 +339,15 @@ export function getAvailableSeriesForCategory(
     case 'phase_selector':
       return ['Новатек ПЕФ-320', 'Новатек ПЕФ-319', 'DigiTOP PS-63A'];
 
+    case 'inverter':
+      return [
+        'Deye SUN-6K-SG04LP1 (1Ф 6кВт)',
+        'Deye SUN-12K-SG04LP3 (3Ф 12кВт)',
+        'Victron MultiPlus-II 48/5000',
+        'Axioma ISGRID 5000',
+        'Huawei SUN2000-10KTL',
+      ];
+
     case 'switch':
       switch (manufacturerId) {
         case 'hager':
@@ -466,6 +475,55 @@ export function mapDeviceToProduct(
       series: 'Новатек ПЕФ-320',
       priceUah: 2150,
       description: 'Компактний універсальний автоматичний перемикач фаз Новатек ПЕФ-320',
+    };
+  }
+
+  // Спеціалізоване обладнання: Гібридні інвертори та ДБЖ
+  if (module.category === 'inverter') {
+    const is3P = module.poles === 4 || module.width >= 6;
+    if (normSeries.includes('victron') || module.name.includes('Victron')) {
+      return {
+        article: 'PMP482505010',
+        modelName: 'Інвертор/ДБЖ Victron MultiPlus-II 48/5000/70-50 230V',
+        series: 'Victron MultiPlus-II',
+        priceUah: 46800,
+        description: 'Преміальний гібридний інвертор-ДБЖ Victron Energy MultiPlus-II (5 кВА / 4 кВт, 48V)',
+      };
+    }
+    if (normSeries.includes('axioma') || normSeries.includes('powmr')) {
+      return {
+        article: 'ISGRID-5000',
+        modelName: 'Гібридний інвертор Axioma Energy ISGRID 5000 (5 кВт, 48V)',
+        series: 'Axioma ISGRID',
+        priceUah: 23500,
+        description: 'Бюджетний автономний/гібридний сонячний інвертор 5 кВт з чистим синусом',
+      };
+    }
+    if (normSeries.includes('huawei')) {
+      return {
+        article: 'SUN2000-10KTL-M1',
+        modelName: 'Гібридний інвертор Huawei SUN2000-10KTL-M1 (10 кВт, 3Ф) + Backup Box',
+        series: 'Huawei SUN2000',
+        priceUah: 72000,
+        description: '3-фазний гібридний інвертор Huawei з підтримкою високовольтних батарей LUNA2000',
+      };
+    }
+    if (is3P) {
+      return {
+        article: 'SUN-12K-SG04LP3-EU',
+        modelName: 'Гібридний інвертор Deye SUN-12K-SG04LP3-EU (12 кВт, 3Ф, 48V АКБ)',
+        series: 'Deye 3Ф SG04LP3',
+        priceUah: 94500,
+        description: 'Топовий трифазний низьковольтний (48V) гібридний інвертор Deye 12 кВт з повноцінним EPS-виходом',
+      };
+    }
+    // За замовчуванням 1Ф: Deye 6kW
+    return {
+      article: 'SUN-6K-SG04LP1-EU',
+      modelName: 'Гібридний інвертор Deye SUN-6K-SG04LP1-EU (6 кВт, 1Ф, 48V АКБ)',
+      series: 'Deye 1Ф SG04LP1',
+      priceUah: 41500,
+      description: 'Найпопулярніший однофазний гібридний інвертор Deye 6 кВт для квартир та будинків',
     };
   }
 

@@ -920,15 +920,15 @@ export const DinRailCanvas: React.FC<DinRailCanvasProps> = ({
                 <span>Очистити</span>
               </button>
 
-              {/* Кнопка зберегти щиток */}
+              {/* Кнопка зберегти */}
               <button
                 type="button"
                 onClick={onSaveSwitchboard}
                 className="no-print flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition cursor-pointer shadow-xs whitespace-nowrap shrink-0"
-                title="Зберегти щиток в акаунт"
+                title="Зберегти в акаунт"
               >
                 <Bookmark className="w-3.5 h-3.5" />
-                <span>Зберегти щиток</span>
+                <span>Зберегти</span>
               </button>
 
               {/* Кнопка друку */}
