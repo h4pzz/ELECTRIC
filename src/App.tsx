@@ -244,9 +244,56 @@ export const App: React.FC = () => {
   };
 
   const userSavedSwitchboards = React.useMemo(() => {
-    if (!user) return savedSwitchboards;
-    return savedSwitchboards.filter((sw) => !sw.userId || sw.userId === user.sub);
-  }, [savedSwitchboards, user]);
+    // Показувати всі збережені щитки в цьому браузері без прихованих фільтрів,
+    // щоб жоден збережений щиток не зникав через розбіжність сесій чи акаунтів
+    return savedSwitchboards;
+  }, [savedSwitchboards]);
+
+  // Експорт конфігурації щитка у файл
+  const handleExportFile = () => {
+    const data = {
+      version: '0.2',
+      exportedAt: new Date().toISOString(),
+      config,
+      modules,
+      manufacturerId,
+      busBars,
+      wires,
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${config.title || 'Щит_електричний'}_${new Date().toISOString().slice(0, 10)}.electro`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('✓ Файл конфігурації щитка завантажено!');
+  };
+
+  // Імпорт конфігурації щитка з файлу
+  const handleImportFile = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const parsed = JSON.parse(e.target?.result as string);
+        if (parsed.config && parsed.modules) {
+          setConfig(parsed.config);
+          setModules(parsed.modules);
+          if (parsed.manufacturerId) setManufacturerId(parsed.manufacturerId);
+          if (parsed.busBars) setBusBars(parsed.busBars);
+          if (parsed.wires) setWires(parsed.wires);
+          showToast('✓ Щиток успішно імпортовано з файлу!');
+        } else {
+          alert('Невірний формат файлу конфігурації щитка.');
+        }
+      } catch (err) {
+        alert('Помилка при читанні файлу: ' + String(err));
+      }
+    };
+    reader.readAsText(file);
+  };
 
   // Зміна додаткових модулів рейки (+1 або -1, розширення пластрона)
   const handleUpdateRailExtraModules = (railIndex: number, delta: number) => {
@@ -674,6 +721,9 @@ export const App: React.FC = () => {
         savedSwitchboards={userSavedSwitchboards}
         onLoadSwitchboard={handleLoadSwitchboard}
         onDeleteSwitchboard={handleDeleteSwitchboard}
+        onSaveSwitchboard={() => setIsSaveModalOpen(true)}
+        onExportFile={handleExportFile}
+        onImportFile={handleImportFile}
       />
 
       {/* 2. Вибір типу щитка та панель управління проводкою */}

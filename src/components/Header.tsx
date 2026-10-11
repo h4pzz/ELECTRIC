@@ -15,6 +15,9 @@ interface HeaderProps {
   savedSwitchboards?: SavedSwitchboard[];
   onLoadSwitchboard?: (switchboard: SavedSwitchboard) => void;
   onDeleteSwitchboard?: (id: string) => void;
+  onSaveSwitchboard?: () => void;
+  onExportFile?: () => void;
+  onImportFile?: (file: File) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -22,6 +25,9 @@ export const Header: React.FC<HeaderProps> = ({
   savedSwitchboards,
   onLoadSwitchboard,
   onDeleteSwitchboard,
+  onSaveSwitchboard,
+  onExportFile,
+  onImportFile,
 }) => {
   return (
     <header className="no-print border-b border-slate-200 bg-white/95 backdrop-blur px-4 py-3 sticky top-0 z-30 shadow-xs">
@@ -54,6 +60,9 @@ export const Header: React.FC<HeaderProps> = ({
             savedSwitchboards={savedSwitchboards}
             onLoadSwitchboard={onLoadSwitchboard}
             onDeleteSwitchboard={onDeleteSwitchboard}
+            onSaveCurrentSwitchboard={onSaveSwitchboard}
+            onExportFile={onExportFile}
+            onImportFile={onImportFile}
           />
         </div>
       </div>

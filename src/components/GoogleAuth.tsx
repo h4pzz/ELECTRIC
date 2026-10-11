@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { LogOut, User as UserIcon, ChevronDown, CheckCircle2, Folder, FolderOpen, Trash2 } from 'lucide-react';
+import { LogOut, User as UserIcon, ChevronDown, CheckCircle2, Folder, FolderOpen, Trash2, Bookmark, Download, Upload, Plus } from 'lucide-react';
 import { GOOGLE_CLIENT_ID } from '../config/auth';
 import type { GoogleUserProfile } from '../types/auth';
 import type { SavedSwitchboard } from '../types/electric';
@@ -59,6 +59,9 @@ interface GoogleAuthProps {
   savedSwitchboards?: SavedSwitchboard[];
   onLoadSwitchboard?: (switchboard: SavedSwitchboard) => void;
   onDeleteSwitchboard?: (id: string) => void;
+  onSaveCurrentSwitchboard?: () => void;
+  onExportFile?: () => void;
+  onImportFile?: (file: File) => void;
 }
 
 export const GoogleAuth: React.FC<GoogleAuthProps> = ({
@@ -66,6 +69,9 @@ export const GoogleAuth: React.FC<GoogleAuthProps> = ({
   savedSwitchboards = [],
   onLoadSwitchboard,
   onDeleteSwitchboard,
+  onSaveCurrentSwitchboard,
+  onExportFile,
+  onImportFile,
 }) => {
   const [user, setUser] = useState<GoogleUserProfile | null>(() => {
     try {
@@ -79,6 +85,7 @@ export const GoogleAuth: React.FC<GoogleAuthProps> = ({
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const buttonContainerRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Закриття меню при кліку поза ним
   useEffect(() => {
@@ -243,20 +250,46 @@ export const GoogleAuth: React.FC<GoogleAuthProps> = ({
                 <Folder className="w-3.5 h-3.5 text-amber-500" />
                 Збережені щитки
               </span>
-              <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-full">
-                {savedSwitchboards.length}
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-full">
+                  {savedSwitchboards.length}
+                </span>
+                {onSaveCurrentSwitchboard && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onSaveCurrentSwitchboard();
+                      setIsDropdownOpen(false);
+                    }}
+                    className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold transition cursor-pointer shadow-2xs"
+                    title="Зберегти поточну схему"
+                  >
+                    <Plus className="w-3 h-3 stroke-[3]" />
+                    <span>Зберегти</span>
+                  </button>
+                )}
+              </div>
             </div>
 
             {savedSwitchboards.length === 0 ? (
               <div className="py-3 px-2 text-center bg-slate-50 rounded-lg border border-dashed border-slate-200">
-                <p className="text-xs text-slate-500 font-medium">Немає збережених щитків</p>
-                <p className="text-[10px] text-slate-400 mt-0.5">
-                  Натисніть кнопку «Зберегти» на панелі
-                </p>
+                <p className="text-xs text-slate-600 font-medium">Немає збережених щитків</p>
+                {onSaveCurrentSwitchboard && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onSaveCurrentSwitchboard();
+                      setIsDropdownOpen(false);
+                    }}
+                    className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition cursor-pointer shadow-xs"
+                  >
+                    <Bookmark className="w-3.5 h-3.5" />
+                    <span>Зберегти поточний щиток</span>
+                  </button>
+                )}
               </div>
             ) : (
-              <div className="max-h-60 overflow-y-auto space-y-1.5 pr-0.5">
+              <div className="max-h-56 overflow-y-auto space-y-1.5 pr-0.5">
                 {savedSwitchboards.map((sw) => (
                   <div
                     key={sw.id}
@@ -313,6 +346,52 @@ export const GoogleAuth: React.FC<GoogleAuthProps> = ({
                 ))}
               </div>
             )}
+
+            {/* Кнопки експорту та імпорту файлів */}
+            <div className="pt-2 mt-2 border-t border-slate-100 flex items-center gap-1.5">
+              {onExportFile && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onExportFile();
+                    setIsDropdownOpen(false);
+                  }}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold transition cursor-pointer"
+                  title="Завантажити файл щитка на комп'ютер"
+                >
+                  <Download className="w-3.5 h-3.5 text-slate-600" />
+                  <span>Експорт файлу</span>
+                </button>
+              )}
+
+              {onImportFile && (
+                <>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    accept=".electro,.json"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        onImportFile(file);
+                        setIsDropdownOpen(false);
+                      }
+                      e.target.value = '';
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold transition cursor-pointer"
+                    title="Завантажити щиток із файлу на комп'ютері"
+                  >
+                    <Upload className="w-3.5 h-3.5 text-slate-600" />
+                    <span>Відкрити файл</span>
+                  </button>
+                </>
+              )}
+            </div>
           </div>
 
           <button
