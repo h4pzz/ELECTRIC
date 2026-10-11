@@ -23,6 +23,7 @@ export type ModuleCategory =
   | 'rcd'           // ПЗВ / УЗО
   | 'rcbo'          // Дифавтомат
   | 'voltage_relay' // Реле напруги
+  | 'phase_selector'// Реле вибору фаз (автоматичний перемикач фаз)
   | 'contactor'     // Контактор
   | 'switch'        // Перемикач 1-0-2 (генератор / мережа)
   | 'cross_module'  // Крос-модуль / розподільчий блок

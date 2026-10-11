@@ -336,6 +336,9 @@ export function getAvailableSeriesForCategory(
     case 'voltage_relay':
       return ['ZUBR D2 (TrueRMS)', 'ZUBR D6 (White display)', 'ZUBR 3F (3-фазне)', 'EU102'];
 
+    case 'phase_selector':
+      return ['Новатек ПЕФ-320', 'Новатек ПЕФ-319', 'DigiTOP PS-63A'];
+
     case 'switch':
       switch (manufacturerId) {
         case 'hager':
@@ -435,6 +438,36 @@ export function mapDeviceToProduct(
   const amps = ratingClean.replace(/^[A-Z]+/i, '') || '16';
   const curve = (ratingClean.match(/^[A-Z]+/i)?.[0] || 'C').toUpperCase();
   const normSeries = requestedSeries ? normalizeSeries(requestedSeries) : '';
+
+  // Спеціалізоване модульне обладнання: Реле вибору фаз
+  if (module.category === 'phase_selector') {
+    if (normSeries.includes('319') || module.name.includes('319') || module.width === 5) {
+      return {
+        article: 'PEF-319',
+        modelName: 'Реле вибору фаз Новатек-Електро ПЕФ-319 (30A, цифровий дисплей)',
+        series: 'Новатек ПЕФ-319',
+        priceUah: 3450,
+        description: 'Мікропроцесорний перемикач фаз Новатек-Електро ПЕФ-319 на 5 DIN модулів',
+      };
+    }
+    if (normSeries.includes('digitop') || normSeries.includes('ps-63') || module.name.includes('PS-63') || module.width === 6) {
+      return {
+        article: 'PS-63A',
+        modelName: 'Автоматичний перемикач фаз DigiTOP PS-63A (63A прямострумне)',
+        series: 'DigiTOP PS-63A',
+        priceUah: 3100,
+        description: 'Автоматичний перемикач фаз з трьома цифровими індикаторами DigiTOP PS-63A',
+      };
+    }
+    // За замовчуванням: Новатек ПЕФ-320
+    return {
+      article: 'PEF-320',
+      modelName: 'Реле вибору фаз Новатек-Електро ПЕФ-320 (16A, 2 DIN)',
+      series: 'Новатек ПЕФ-320',
+      priceUah: 2150,
+      description: 'Компактний універсальний автоматичний перемикач фаз Новатек ПЕФ-320',
+    };
+  }
 
   switch (manufacturerId) {
     // =======================================================================

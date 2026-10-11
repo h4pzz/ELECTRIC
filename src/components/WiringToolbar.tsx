@@ -104,8 +104,8 @@ export const WiringToolbar: React.FC<WiringToolbarProps> = ({
 
       {/* Дворівневий контейнер (висота h-[56px]): кольори зверху, опції під ними */}
       <div className="flex flex-col gap-1 h-[56px] justify-between">
-        {/* 1. Верхній рядок: Кольори */}
-        <div className="flex items-center gap-1 bg-slate-50 p-0.5 rounded-lg border border-slate-200 h-[26px] w-fit">
+        {/* 1. Верхній рядок: Кольори (відстань між комірками мінімум 4-5 пікселів) */}
+        <div className="flex items-center gap-[5px] bg-slate-50 p-0.5 rounded-lg border border-slate-200 h-[26px] w-fit">
           {(Object.keys(WIRE_COLOR_CONFIG) as WireColor[]).map((cKey) => {
             const cfg = WIRE_COLOR_CONFIG[cKey];
             const isSelected = selectedColor === cKey;
@@ -115,17 +115,17 @@ export const WiringToolbar: React.FC<WiringToolbarProps> = ({
                 key={cKey}
                 type="button"
                 onClick={() => onSelectColor(cKey)}
-                className={`h-5 px-1.5 text-[11px] rounded flex items-center gap-1 transition-all cursor-pointer ${
+                className={`h-5 min-w-[48px] px-2 text-[11px] rounded flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                   cfg.bgClass
                 } ${
                   isSelected
-                    ? 'ring-2 ring-amber-500 shadow-xs scale-105 font-black'
+                    ? 'ring-2 ring-amber-500 shadow-xs font-black'
                     : 'opacity-85 hover:opacity-100 font-semibold'
                 }`}
                 title={cfg.name}
               >
                 <span
-                  className="w-1.5 h-1.5 rounded-full border border-black/20 shadow-inner shrink-0"
+                  className="w-2 h-2 rounded-full border border-black/20 shadow-inner shrink-0"
                   style={{
                     background:
                       cKey === 'yellow_green'
@@ -133,7 +133,7 @@ export const WiringToolbar: React.FC<WiringToolbarProps> = ({
                         : cfg.hex,
                   }}
                 />
-                <span className="text-[10px] leading-none">{cfg.role}</span>
+                <span className="text-[11px] leading-none font-bold">{cfg.role}</span>
               </button>
             );
           })}

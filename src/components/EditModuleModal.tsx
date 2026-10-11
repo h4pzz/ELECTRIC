@@ -128,8 +128,8 @@ export const EditModuleModal: React.FC<EditModuleModalProps> = ({
       <div className="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
         
         <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-          <h3 className="text-base font-bold text-slate-900">
-            Параметри модуля ({module.name})
+          <h3 className="text-base font-semibold text-slate-900">
+            Параметри модуля (<span className="font-normal">{module.name}</span>)
           </h3>
           <button
             onClick={onClose}
@@ -268,7 +268,7 @@ export const EditModuleModal: React.FC<EditModuleModalProps> = ({
 
               {matchedProduct && (
                 <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs space-y-1">
-                  <div className="font-bold text-slate-900">{matchedProduct.modelName}</div>
+                  <div className="font-normal text-slate-900">{matchedProduct.modelName}</div>
                   <div className="flex items-center justify-between text-slate-600">
                     <span className="font-mono text-amber-800 font-bold">Арт: {matchedProduct.article}</span>
                     <span className="font-bold text-slate-900">{matchedProduct.priceUah} ₴</span>

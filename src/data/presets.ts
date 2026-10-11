@@ -257,31 +257,31 @@ export const APARTMENT_PRESET_WIRES: WireConnection[] = [
     to: { moduleId: 'preset-2', terminalType: 'bottom', poleIndex: 1 },
     color: 'blue', // Нуль N
   },
-  // ZUBR (верх) -> Крос-модуль 2P (верх)
+  // ZUBR (верх) -> Крос-модуль 2P (cm1: фаза L, cm2: нуль N)
   {
     id: 'wire-preset-3',
     from: { moduleId: 'preset-2', terminalType: 'top', poleIndex: 0 },
-    to: { moduleId: 'preset-3', terminalType: 'top', poleIndex: 0 },
+    to: { moduleId: 'preset-3', terminalType: 'cm1', poleIndex: 0 },
     color: 'red', // Фаза захищена
   },
   {
     id: 'wire-preset-4',
     from: { moduleId: 'preset-2', terminalType: 'top', poleIndex: 1 },
-    to: { moduleId: 'preset-3', terminalType: 'top', poleIndex: 1 },
-    color: 'blue', // Нуль
+    to: { moduleId: 'preset-3', terminalType: 'cm2', poleIndex: 0 },
+    color: 'blue', // Нуль N
   },
-  // Крос-модуль (низ) -> ПЗВ №1 (верх)
+  // Крос-модуль -> ПЗВ №1 (верх)
   {
     id: 'wire-preset-5',
-    from: { moduleId: 'preset-3', terminalType: 'bottom', poleIndex: 0 },
+    from: { moduleId: 'preset-3', terminalType: 'cm1', poleIndex: 1 },
     to: { moduleId: 'preset-4', terminalType: 'top', poleIndex: 0 },
     color: 'gray', // Фаза L2/група
   },
   {
     id: 'wire-preset-6',
-    from: { moduleId: 'preset-3', terminalType: 'bottom', poleIndex: 1 },
+    from: { moduleId: 'preset-3', terminalType: 'cm2', poleIndex: 1 },
     to: { moduleId: 'preset-4', terminalType: 'top', poleIndex: 1 },
-    color: 'blue', // Нуль
+    color: 'blue', // Нуль N
   },
   // PE-шина -> Сервісна розетка
   {

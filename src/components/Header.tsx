@@ -38,7 +38,7 @@ export const Header: React.FC<HeaderProps> = ({
                 PRO
               </span>
               <span className="text-[11px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-mono font-semibold border border-slate-200">
-                v0.1
+                v0.2
               </span>
             </h1>
             <p className="text-xs text-slate-500">

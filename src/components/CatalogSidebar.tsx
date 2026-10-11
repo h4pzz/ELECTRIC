@@ -18,6 +18,7 @@ export const CatalogSidebar: React.FC<CatalogSidebarProps> = ({ onAddDevice, row
     { id: 'all', label: 'Всі' },
     { id: 'breaker', label: 'Автомати' },
     { id: 'switch', label: '1-0-2 Резерв' },
+    { id: 'phase_selector', label: 'Вибір фаз' },
     { id: 'rcd', label: 'ПЗВ (УЗО)' },
     { id: 'rcbo', label: 'Дифавтомати' },
     { id: 'voltage_relay', label: 'Реле напруги' },
@@ -34,7 +35,7 @@ export const CatalogSidebar: React.FC<CatalogSidebarProps> = ({ onAddDevice, row
 
     if (activeCategory === 'all') return true;
     if (activeCategory === 'other') {
-      return !['breaker', 'rcd', 'rcbo', 'voltage_relay', 'switch'].includes(dev.category);
+      return !['breaker', 'rcd', 'rcbo', 'voltage_relay', 'switch', 'phase_selector'].includes(dev.category);
     }
     return dev.category === activeCategory;
   });
@@ -52,6 +53,8 @@ export const CatalogSidebar: React.FC<CatalogSidebarProps> = ({ onAddDevice, row
         return <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 font-medium">MCB</span>;
       case 'switch':
         return <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-50 text-orange-700 border border-orange-200 font-bold">1-0-2</span>;
+      case 'phase_selector':
+        return <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-50 text-violet-700 border border-violet-200 font-bold">ПЕФ</span>;
       case 'rcd':
         return <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium">RCD</span>;
       case 'rcbo':
@@ -141,7 +144,7 @@ export const CatalogSidebar: React.FC<CatalogSidebarProps> = ({ onAddDevice, row
                 />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-xs font-bold text-slate-900 group-hover:text-amber-800 transition truncate">
+                    <span className="text-xs font-normal text-slate-900 group-hover:text-amber-800 transition truncate">
                       {dev.name}
                     </span>
                     {getCategoryBadge(dev.category)}

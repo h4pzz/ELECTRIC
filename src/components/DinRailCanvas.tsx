@@ -70,8 +70,24 @@ function getCircuitForWire(
 
   const targetColor = targetWire.color;
 
+  const normalizeTermKey = (moduleId: string, terminalType: string, poleIndex: number) => {
+    const mod = modules.find((m) => m.id === moduleId);
+    if (!mod || mod.category !== 'cross_module') {
+      return `${moduleId}-${terminalType}-${poleIndex}`;
+    }
+    if (terminalType !== 'top' && terminalType !== 'bottom') {
+      return `${moduleId}-${terminalType}-${poleIndex}`;
+    }
+    const is2P = mod.poles === 2;
+    const tier = is2P
+      ? (poleIndex === 0 ? 'cm1' : 'cm2')
+      : (poleIndex === 0 ? 'cm1' : poleIndex === 1 ? 'cm2' : poleIndex === 2 ? 'cm3' : 'cm4');
+    const pole = terminalType === 'bottom' ? 1 : 0;
+    return `${moduleId}-${tier}-${pole}`;
+  };
+
   const termKey = (moduleId: string, terminalType: string, poleIndex: number) =>
-    `${moduleId}-${terminalType}-${poleIndex}`;
+    normalizeTermKey(moduleId, terminalType, poleIndex);
 
   const adj = new Map<string, Set<string>>();
   const addEdge = (k1: string, k2: string) => {
@@ -391,10 +407,31 @@ export const DinRailCanvas: React.FC<DinRailCanvasProps> = ({
     });
   };
 
+  // Допоміжна нормалізація клем для крос-модулів (сумісність зі старими пресетами та збереженими проектами)
+  const normalizeCrossModuleTermKey = (moduleId: string, terminalType: TerminalId['terminalType'], poleIndex: number): string => {
+    const mod = modules.find((m) => m.id === moduleId);
+    if (!mod || mod.category !== 'cross_module') {
+      return `${terminalType}-${poleIndex}`;
+    }
+    if (terminalType !== 'top' && terminalType !== 'bottom') {
+      return `${terminalType}-${poleIndex}`;
+    }
+    const is2P = mod.poles === 2;
+    const tier = is2P
+      ? (poleIndex === 0 ? 'cm1' : 'cm2')
+      : (poleIndex === 0 ? 'cm1' : poleIndex === 1 ? 'cm2' : poleIndex === 2 ? 'cm3' : 'cm4');
+    const pole = terminalType === 'bottom' ? 1 : 0;
+    return `${tier}-${pole}`;
+  };
+
   // Отримуємо центр клеми за її TerminalId
   const getTerminalCoords = (term: TerminalId): { x: number; y: number } | null => {
     if (!containerRef.current) return null;
-    const elem = document.getElementById(`term-${term.moduleId}-${term.terminalType}-${term.poleIndex}`);
+    let elem = document.getElementById(`term-${term.moduleId}-${term.terminalType}-${term.poleIndex}`);
+    if (!elem) {
+      const normalizedKey = normalizeCrossModuleTermKey(term.moduleId, term.terminalType, term.poleIndex);
+      elem = document.getElementById(`term-${term.moduleId}-${normalizedKey}`);
+    }
     if (!elem) return null;
 
     const elemRect = elem.getBoundingClientRect();
@@ -411,12 +448,12 @@ export const DinRailCanvas: React.FC<DinRailCanvasProps> = ({
     const map = new Map<string, WireColor[]>();
     wires.forEach((w) => {
       if (w.from.moduleId === moduleId) {
-        const key = `${w.from.terminalType}-${w.from.poleIndex}`;
+        const key = normalizeCrossModuleTermKey(moduleId, w.from.terminalType, w.from.poleIndex);
         if (!map.has(key)) map.set(key, []);
         map.get(key)!.push(w.color);
       }
       if (w.to.moduleId === moduleId) {
-        const key = `${w.to.terminalType}-${w.to.poleIndex}`;
+        const key = normalizeCrossModuleTermKey(moduleId, w.to.terminalType, w.to.poleIndex);
         if (!map.has(key)) map.set(key, []);
         map.get(key)!.push(w.color);
       }
@@ -429,12 +466,12 @@ export const DinRailCanvas: React.FC<DinRailCanvasProps> = ({
     const map = new Map<string, WireConnection[]>();
     wires.forEach((w) => {
       if (w.from.moduleId === moduleId) {
-        const key = `${w.from.terminalType}-${w.from.poleIndex}`;
+        const key = normalizeCrossModuleTermKey(moduleId, w.from.terminalType, w.from.poleIndex);
         if (!map.has(key)) map.set(key, []);
         map.get(key)!.push(w);
       }
       if (w.to.moduleId === moduleId) {
-        const key = `${w.to.terminalType}-${w.to.poleIndex}`;
+        const key = normalizeCrossModuleTermKey(moduleId, w.to.terminalType, w.to.poleIndex);
         if (!map.has(key)) map.set(key, []);
         map.get(key)!.push(w);
       }
@@ -556,13 +593,22 @@ export const DinRailCanvas: React.FC<DinRailCanvasProps> = ({
   };
 
   // Визначає, чи є клема верхнього спрямування (виходить вгору)
-  const isTopTerminal = (termType: TerminalId['terminalType']): boolean => {
-    return termType === 'top' || termType === 'cm1' || termType === 'cm2';
+  const isTopTerminal = (termType: TerminalId['terminalType'], moduleId?: string): boolean => {
+    if (termType === 'top' || termType === 'cm1') return true;
+    if (termType === 'bottom' || termType === 'cm3' || termType === 'cm4') return false;
+    if (termType === 'cm2') {
+      if (moduleId) {
+        const mod = modules.find((m) => m.id === moduleId);
+        if (mod && mod.poles === 2) return false; // N-шина на 2P крос-модулі — це нижня шина
+      }
+      return true;
+    }
+    return true;
   };
 
   // Визначає, чи є клема нижнього спрямування (виходить вниз)
-  const isBottomTerminal = (termType: TerminalId['terminalType']): boolean => {
-    return termType === 'bottom' || termType === 'cm3' || termType === 'cm4';
+  const isBottomTerminal = (termType: TerminalId['terminalType'], moduleId?: string): boolean => {
+    return !isTopTerminal(termType, moduleId) && termType !== 'bus';
   };
 
   // Визначаємо, чи повинен провід проходити через бічний кабель-канал,
@@ -577,8 +623,8 @@ export const DinRailCanvas: React.FC<DinRailCanvasProps> = ({
     const r1 = getTerminalRail(fromTerm);
     const r2 = getTerminalRail(toTerm);
 
-    const fromIsTop = isTopTerminal(fromTerm.terminalType);
-    const toIsTop = isTopTerminal(toTerm.terminalType);
+    const fromIsTop = isTopTerminal(fromTerm.terminalType, fromTerm.moduleId);
+    const toIsTop = isTopTerminal(toTerm.terminalType, toTerm.moduleId);
 
     // Якщо один з кінців - це шина N або PE нагорі (r === -1)
     if (r1 === -1 || r2 === -1) {

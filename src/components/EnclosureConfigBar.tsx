@@ -57,11 +57,12 @@ export const EnclosureConfigBar: React.FC<EnclosureConfigBarProps> = ({ config, 
             <Layers className="w-3.5 h-3.5 text-amber-500" />
             Кількість рядів та модулів
           </label>
-          <div className="flex flex-col gap-1 h-[56px] justify-between">
-            {/* Верхній рядок: Ряди × Мод./ряд */}
-            <div className="flex items-center gap-1.5">
-              <div className="flex items-center gap-1 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200 h-[26px]">
-                <span className="text-[11px] text-slate-500">Ряди:</span>
+          <div className="flex items-start gap-1.5 h-[56px]">
+            {/* Ліва колонка: Ряди зверху, Разом знизу (однаковий розмір w-[116px] h-[26px]) */}
+            <div className="flex flex-col gap-1 justify-between h-full">
+              {/* Ряди */}
+              <div className="flex items-center justify-between gap-1 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200 h-[26px] w-[116px]">
+                <span className="text-[11px] text-slate-500 whitespace-nowrap">Ряди:</span>
                 <select
                   value={config.rows}
                   onChange={(e) => onChange({ rows: Number(e.target.value) })}
@@ -75,34 +76,35 @@ export const EnclosureConfigBar: React.FC<EnclosureConfigBarProps> = ({ config, 
                 </select>
               </div>
 
-              <span className="text-slate-400 text-xs">×</span>
-
-              <div className="flex items-center gap-1 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200 h-[26px]">
-                <span className="text-[11px] text-slate-500">Мод./ряд:</span>
-                <select
-                  value={config.modulesPerRow}
-                  onChange={(e) => onChange({ modulesPerRow: Number(e.target.value) })}
-                  className="bg-transparent text-[11px] font-bold text-slate-800 focus:outline-none cursor-pointer pr-0.5"
-                >
-                  {[8, 12, 14, 18, 24].map((num) => (
-                    <option key={num} value={num} className="bg-white text-slate-800">
-                      {num} мод
-                    </option>
-                  ))}
-                </select>
+              {/* Разом (розмір комірки точно такий же як і Ряди) */}
+              <div className="flex items-center gap-1 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-lg h-[26px] w-[116px]">
+                <span className="text-[11px] text-amber-900 font-medium whitespace-nowrap truncate">
+                  Разом: <strong className="text-amber-700 font-bold">{totalModulesCount}</strong> мод.
+                  {totalExtra > 0 && (
+                    <span className="text-[10px] text-amber-700 font-normal ml-0.5">
+                      ({config.rows * config.modulesPerRow}+{totalExtra})
+                    </span>
+                  )}
+                </span>
               </div>
             </div>
 
-            {/* Нижній рядок: Разом під Ряди */}
-            <div className="flex items-center gap-1 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-lg h-[24px] w-fit">
-              <span className="text-[11px] text-amber-900 font-medium">
-                Разом: <strong className="text-amber-700 font-bold">{totalModulesCount}</strong> мод.
-                {totalExtra > 0 && (
-                  <span className="text-[10px] text-amber-700 font-normal ml-0.5">
-                    ({config.rows * config.modulesPerRow}+{totalExtra})
-                  </span>
-                )}
-              </span>
+            <span className="text-slate-400 text-xs mt-1">×</span>
+
+            {/* Права колонка: Мод./ряд */}
+            <div className="flex items-center gap-1 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200 h-[26px]">
+              <span className="text-[11px] text-slate-500 whitespace-nowrap">Мод./ряд:</span>
+              <select
+                value={config.modulesPerRow}
+                onChange={(e) => onChange({ modulesPerRow: Number(e.target.value) })}
+                className="bg-transparent text-[11px] font-bold text-slate-800 focus:outline-none cursor-pointer pr-0.5"
+              >
+                {[8, 12, 14, 18, 24].map((num) => (
+                  <option key={num} value={num} className="bg-white text-slate-800">
+                    {num} мод
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         </div>

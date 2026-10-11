@@ -18,7 +18,6 @@ import { EnclosureConfigBar } from './components/EnclosureConfigBar';
 import { WiringToolbar } from './components/WiringToolbar';
 import { CatalogSidebar } from './components/CatalogSidebar';
 import { DinRailCanvas } from './components/DinRailCanvas';
-import { ManufacturerSelector } from './components/ManufacturerSelector';
 import { SpecificationTable } from './components/SpecificationTable';
 import { EditModuleModal } from './components/EditModuleModal';
 import { LabelSheetModal } from './components/LabelSheetModal';
@@ -93,7 +92,27 @@ export const App: React.FC = () => {
     const saved = localStorage.getItem(STORAGE_KEY_WIRES);
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed.map((w: WireConnection) => {
+            const upgrade = (term: TerminalId): TerminalId => {
+              if (term.moduleId === 'preset-3') {
+                if (term.terminalType === 'top') {
+                  return { ...term, terminalType: term.poleIndex === 0 ? 'cm1' : 'cm2', poleIndex: 0 };
+                }
+                if (term.terminalType === 'bottom') {
+                  return { ...term, terminalType: term.poleIndex === 0 ? 'cm1' : 'cm2', poleIndex: 1 };
+                }
+              }
+              return term;
+            };
+            return {
+              ...w,
+              from: upgrade(w.from),
+              to: upgrade(w.to),
+            };
+          });
+        }
       } catch (e) {
         // ignore
       }
@@ -506,6 +525,19 @@ export const App: React.FC = () => {
         alert('На цю клему вже підключено 2 проводи (максимум для однієї клеми за нормами ПУЕ).');
         return;
       }
+
+      // Якщо клікнули на шину N крос-модуля або верхню шину N — автоматично обираємо синій провід
+      const clickedMod = modules.find((m) => m.id === terminal.moduleId);
+      const isCrossModuleN =
+        clickedMod?.category === 'cross_module' &&
+        (terminal.terminalType === 'cm4' ||
+          (clickedMod.poles === 2 && terminal.terminalType === 'cm2') ||
+          (clickedMod.poles === 1 && terminal.terminalType === 'cm1'));
+      const isUpperBusN = busBars.some((b) => b.id === terminal.moduleId && b.type === 'n');
+      if ((isCrossModuleN || isUpperBusN) && selectedWireColor !== 'blue') {
+        setSelectedWireColor('blue');
+      }
+
       setActiveTerminal(terminal);
     } else {
       if (
@@ -529,11 +561,34 @@ export const App: React.FC = () => {
       );
 
       if (!alreadyExists) {
+        const fromMod = modules.find((m) => m.id === activeTerminal.moduleId);
+        const toMod = modules.find((m) => m.id === terminal.moduleId);
+
+        const isN1 =
+          (fromMod?.category === 'cross_module' &&
+            (activeTerminal.terminalType === 'cm4' ||
+              (fromMod.poles === 2 && activeTerminal.terminalType === 'cm2') ||
+              (fromMod.poles === 1 && activeTerminal.terminalType === 'cm1'))) ||
+          busBars.some((b) => b.id === activeTerminal.moduleId && b.type === 'n');
+
+        const isN2 =
+          (toMod?.category === 'cross_module' &&
+            (terminal.terminalType === 'cm4' ||
+              (toMod.poles === 2 && terminal.terminalType === 'cm2') ||
+              (toMod.poles === 1 && terminal.terminalType === 'cm1'))) ||
+          busBars.some((b) => b.id === terminal.moduleId && b.type === 'n');
+
+        // Якщо з'єднання веде до N і це не земля — гарантуємо синій колір
+        const finalColor =
+          (isN1 || isN2) && selectedWireColor !== 'blue' && selectedWireColor !== 'yellow_green'
+            ? 'blue'
+            : selectedWireColor;
+
         const newWire: WireConnection = {
           id: `wire-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
           from: activeTerminal,
           to: terminal,
-          color: selectedWireColor,
+          color: finalColor,
         };
         setWires((prev) => [...prev, newWire]);
       }
@@ -685,20 +740,13 @@ export const App: React.FC = () => {
         </div>
       </div>
 
-      {/* 5. Вибір виробника обладнання */}
-      <div className="no-print">
-        <ManufacturerSelector
-          selectedManufacturer={manufacturerId}
-          onSelectManufacturer={(id) => setManufacturerId(id)}
-        />
-      </div>
-
-      {/* 6. Автоматично підтягнуті моделі, специфікація та кошторис */}
+      {/* 5. Специфікація та підібрані моделі */}
       <div className="no-print">
         <SpecificationTable
           config={config}
           modules={modules}
           manufacturerId={manufacturerId}
+          onSelectManufacturer={(id) => setManufacturerId(id)}
           onUpdateModules={setModules}
           onUpdateConfig={(updates) => setConfig((prev) => ({ ...prev, ...updates }))}
         />

@@ -88,7 +88,7 @@ export const LabelSheetModal: React.FC<LabelSheetModalProps> = ({
                           <span>#{idx + 1}</span>
                           <span className="font-bold text-slate-700">{m.rating}</span>
                         </div>
-                        <div className="text-[10px] font-extrabold text-slate-900 leading-tight line-clamp-2">
+                        <div className="text-[10px] font-normal text-slate-900 leading-tight line-clamp-2">
                           {m.label || m.name}
                         </div>
                         <div className="text-[8px] font-mono text-slate-500 uppercase">

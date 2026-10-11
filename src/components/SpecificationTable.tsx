@@ -27,12 +27,14 @@ import {
   Sparkles,
   Layers,
   ChevronDown,
+  Factory,
 } from 'lucide-react';
 
 interface SpecificationTableProps {
   config: EnclosureConfig;
   modules: PlacedModule[];
   manufacturerId: ManufacturerId;
+  onSelectManufacturer?: (id: ManufacturerId) => void;
   onUpdateModules?: (modules: PlacedModule[]) => void;
   onUpdateConfig?: (updates: Partial<EnclosureConfig>) => void;
 }
@@ -59,6 +61,7 @@ export const SpecificationTable: React.FC<SpecificationTableProps> = ({
   config,
   modules,
   manufacturerId,
+  onSelectManufacturer,
   onUpdateModules,
   onUpdateConfig,
 }) => {
@@ -322,9 +325,9 @@ export const SpecificationTable: React.FC<SpecificationTableProps> = ({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="flex items-center gap-2">
-              <FileText className="w-5 h-5 text-amber-500" />
+              <FileText className="w-5 h-5 text-amber-500 shrink-0" />
               <h3 className="text-base font-bold text-slate-900">
-                Специфікація та підібрані моделі ({currentMfr.name})
+                Специфікація та підібрані моделі
               </h3>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
@@ -332,7 +335,7 @@ export const SpecificationTable: React.FC<SpecificationTableProps> = ({
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
               onClick={handleExportCsv}
@@ -352,31 +355,54 @@ export const SpecificationTable: React.FC<SpecificationTableProps> = ({
           </div>
         </div>
 
-        {/* Швидка масова зміна серії автоматів */}
-        <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-3 flex flex-wrap items-center justify-between gap-2.5">
+        {/* Виробник обладнання та швидка зміна серії в одному рядку */}
+        <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3">
+          {/* Вибір виробника обладнання */}
           <div className="flex items-center gap-2">
-            <Layers className="w-4 h-4 text-amber-600 shrink-0" />
-            <span className="text-xs font-bold text-amber-950">
-              Швидка зміна серії автоматів ({currentMfr.name}):
-            </span>
-            <span className="text-[11px] text-amber-800 hidden sm:inline">
-              Застосувати серію до всіх автоматичних вимикачів в один клік:
-            </span>
+            <Factory className="w-4 h-4 text-amber-600 shrink-0" />
+            <label htmlFor="manufacturer-select" className="text-xs font-bold text-amber-950 whitespace-nowrap">
+              Виробник обладнання:
+            </label>
+            <div className="relative">
+              <select
+                id="manufacturer-select"
+                value={manufacturerId}
+                onChange={(e) => onSelectManufacturer?.(e.target.value as ManufacturerId)}
+                className="appearance-none bg-white hover:bg-slate-50 border border-amber-300 hover:border-amber-400 focus:border-amber-500 focus:ring-2 focus:ring-amber-200 text-slate-900 text-xs font-bold rounded-lg pl-2.5 pr-7 py-1.5 cursor-pointer shadow-2xs transition outline-none"
+              >
+                {MANUFACTURERS.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name} ({m.country})
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-500 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-1.5">
-            {mainBreakerSeriesList.map((ser) => (
-              <button
-                key={ser}
-                type="button"
-                onClick={() => handleBulkBreakerSeriesChange(ser)}
-                className="px-2.5 py-1 text-xs font-semibold bg-white hover:bg-amber-100 hover:border-amber-400 text-slate-800 border border-amber-300 rounded-md shadow-2xs transition cursor-pointer flex items-center gap-1"
-                title={`Перевести всі автоматичні вимикачі на серію ${ser}`}
-              >
-                <Sparkles className="w-3 h-3 text-amber-500" />
-                <span>{ser}</span>
-              </button>
-            ))}
+          {/* Швидка зміна серії автоматів */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1.5">
+              <Layers className="w-4 h-4 text-amber-600 shrink-0" />
+              <span className="text-xs font-bold text-amber-950">
+                Швидка зміна серії автоматів ({currentMfr.name}):
+              </span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5">
+              {mainBreakerSeriesList.map((ser) => (
+                <button
+                  key={ser}
+                  type="button"
+                  onClick={() => handleBulkBreakerSeriesChange(ser)}
+                  className="px-2.5 py-1 text-xs font-semibold bg-white hover:bg-amber-100 hover:border-amber-400 text-slate-800 border border-amber-300 rounded-md shadow-2xs transition cursor-pointer flex items-center gap-1"
+                  title={`Перевести всі автоматичні вимикачі на серію ${ser}`}
+                >
+                  <Sparkles className="w-3 h-3 text-amber-500" />
+                  <span>{ser}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -512,7 +538,7 @@ export const SpecificationTable: React.FC<SpecificationTableProps> = ({
                   </td>
 
                   {/* Найменування моделі */}
-                  <td className="py-2.5 px-3 text-slate-900 font-medium max-w-sm">
+                  <td className="py-2.5 px-3 text-slate-900 font-normal max-w-sm">
                     <div className="flex items-center justify-between gap-2">
                       <span className="truncate" title={item.modelName}>{item.modelName}</span>
                       <button

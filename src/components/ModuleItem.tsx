@@ -65,6 +65,7 @@ export const ModuleItem: React.FC<ModuleItemProps> = ({
 
   const isRcd = module.category === 'rcd' || module.category === 'rcbo';
   const isVoltageRelay = module.category === 'voltage_relay';
+  const isPhaseSelector = module.category === 'phase_selector';
   const isBlank = module.category === 'blank';
   const isSwitch = module.category === 'switch';
   const isCrossModule = module.category === 'cross_module';
@@ -73,10 +74,10 @@ export const ModuleItem: React.FC<ModuleItemProps> = ({
   const crossBarsCount = isCrossModule ? (module.poles === 4 ? 4 : module.poles === 2 ? 2 : 1) : 0;
   const crossTerminalsPerRow = (module.crossModuleTerminalsPerRow || 7) as 4 | 7 | 8 | 11;
 
-  // Для перемикача 1-0-2: по 2 входи на кожен полюс/модуль зверху (Ввід I та Ввід II)
-  // та по 1 виходу знизу (Навантаження)
-  const topTerminalsCount = isBlank || isCrossModule ? 0 : isSwitch ? module.poles * 2 : module.poles;
-  const bottomTerminalsCount = isBlank || isCrossModule ? 0 : module.poles;
+  // Для перемикача 1-0-2: по 2 входи на кожен полюс/модуль зверху (Ввід I та Ввід II) та по 1 виходу знизу
+  // Для реле вибору фаз (наприклад ПЕФ-320): 4 входи зверху (L1, L2, L3, N) та 2 виходи знизу (L_вихід, N)
+  const topTerminalsCount = isBlank || isCrossModule ? 0 : isSwitch ? module.poles * 2 : isPhaseSelector ? 4 : module.poles;
+  const bottomTerminalsCount = isBlank || isCrossModule ? 0 : isPhaseSelector ? 2 : module.poles;
 
   const isTerminalActive = (type: TerminalId['terminalType'], poleIdx: number) => {
     return (
@@ -125,6 +126,18 @@ export const ModuleItem: React.FC<ModuleItemProps> = ({
           termTitle = `Вихід навантаження ${phaseLabel}. Підключено проводів: ${termWires.length}/2.`;
           termBadge = 'OUT';
         }
+      } else if (isPhaseSelector) {
+        if (type === 'top') {
+          const phaseNames = ['L1', 'L2', 'L3', 'N'];
+          const pName = phaseNames[poleIdx] || `Вхід ${poleIdx + 1}`;
+          termTitle = `Вхід ${pName} для контролю та вибору фази. Підключено: ${termWires.length}/2.`;
+          termBadge = pName;
+        } else {
+          const outNames = ['Lвих', 'N'];
+          const oName = outNames[poleIdx] || `Вихід ${poleIdx + 1}`;
+          termTitle = `Вихід навантаження ${oName} (обрана фаза). Підключено: ${termWires.length}/2.`;
+          termBadge = oName;
+        }
       } else {
         termTitle = `Клема ${type === 'top' ? 'входу' : 'виходу'} (Полюс ${poleIdx + 1}). Підключено проводів: ${termWires.length}/2.`;
       }
@@ -138,6 +151,8 @@ export const ModuleItem: React.FC<ModuleItemProps> = ({
         <button
           id={`term-${module.id}-${type}-${poleIdx}`}
           type="button"
+          draggable={false}
+          onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();
             onTerminalClick?.({
@@ -322,7 +337,6 @@ export const ModuleItem: React.FC<ModuleItemProps> = ({
       {/* Cross-Module Specialized Body (Східчастий крос-блок з 4 або 2 латунними шинами) */}
       {isCrossModule ? (
         <div
-          data-module-body="true"
           className="flex-1 min-h-0 w-full flex flex-col justify-between rounded bg-sky-950/5 border border-sky-300/80 p-1 relative overflow-hidden backdrop-blur-[0.5px]"
         >
           {/* Напівпрозора кришка-козирок крос-блока */}
@@ -344,30 +358,66 @@ export const ModuleItem: React.FC<ModuleItemProps> = ({
 
           {/* Паралельні латунні шини (сходинки) */}
           <div className="flex-1 flex flex-col justify-around py-0.5 gap-0.5">
-            {crossModuleBarsConfig.map((bar, barIdx) => (
-              <div
-                key={barIdx}
-                className={`flex items-center justify-between px-1 py-0.5 rounded border ${bar.borderCol} ${bar.barBg} shadow-[inset_0_1px_2px_rgba(0,0,0,0.1)] relative`}
-              >
-                {/* Бейдж шини (L1, L2, L3, N) */}
-                <span
-                  className={`w-4 h-4 rounded-xs text-[8px] font-mono font-black flex items-center justify-center flex-shrink-0 shadow-2xs ${bar.badgeBg}`}
-                >
-                  {bar.label}
-                </span>
+            {crossModuleBarsConfig.map((bar, barIdx) => {
+              const isTierActive =
+                activeTerminal?.moduleId === module.id && activeTerminal?.terminalType === bar.tierType;
+              const isTierInCircuit = Array.from({ length: crossTerminalsPerRow }).some((_, tIdx) =>
+                highlightedTerminals?.has(`${bar.tierType}-${tIdx}`)
+              );
 
-                {/* Гвинтові клеми шини */}
-                <div className="flex items-center justify-around flex-1 px-1">
-                  {Array.from({ length: crossTerminalsPerRow }).map((_, termIdx) =>
-                    renderTerminal(
-                      bar.tierType,
-                      termIdx,
-                      `Шина ${bar.label} (клема #${termIdx + 1} з ${crossTerminalsPerRow}). Всі клеми цієї шини з'єднані паралельно.`
-                    )
-                  )}
+              return (
+                <div
+                  key={barIdx}
+                  className={`flex items-center justify-between px-1 py-0.5 rounded border transition-all relative ${
+                    isTierActive
+                      ? 'ring-2 ring-blue-500 border-blue-600 bg-blue-100 shadow-sm'
+                      : isTierInCircuit
+                      ? 'ring-2 ring-amber-400 border-amber-500 bg-amber-100/90 shadow-[0_0_8px_rgba(245,158,11,0.5)] animate-pulse'
+                      : `${bar.borderCol} ${bar.barBg} shadow-[inset_0_1px_2px_rgba(0,0,0,0.1)]`
+                  }`}
+                >
+                  {/* Бейдж шини (L1, L2, L3, N) - клікабельний для швидкого підключення до вільної клеми */}
+                  <button
+                    type="button"
+                    draggable={false}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      let targetIdx = 0;
+                      for (let i = 0; i < crossTerminalsPerRow; i++) {
+                        const cnt = connectedWires?.get(`${bar.tierType}-${i}`)?.length || 0;
+                        if (cnt < 2) {
+                          targetIdx = i;
+                          break;
+                        }
+                      }
+                      onTerminalClick?.({
+                        moduleId: module.id,
+                        terminalType: bar.tierType,
+                        poleIndex: targetIdx,
+                      });
+                    }}
+                    className={`w-4 h-4 rounded-xs text-[8px] font-mono font-black flex items-center justify-center flex-shrink-0 shadow-2xs cursor-pointer hover:scale-115 active:scale-95 transition-transform ${bar.badgeBg} ${
+                      isTierActive ? 'ring-2 ring-white animate-pulse' : ''
+                    }`}
+                    title={`Шина ${bar.label}: клікніть для швидкого підключення дроту до вільної клеми`}
+                  >
+                    {bar.label}
+                  </button>
+
+                  {/* Гвинтові клеми шини */}
+                  <div className="flex items-center justify-around flex-1 px-1">
+                    {Array.from({ length: crossTerminalsPerRow }).map((_, termIdx) =>
+                      renderTerminal(
+                        bar.tierType,
+                        termIdx,
+                        `Шина ${bar.label} (клема #${termIdx + 1} з ${crossTerminalsPerRow}). Всі клеми цієї шини з'єднані паралельно.`
+                      )
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Нижній підпис характеристик крос-блока */}
@@ -416,7 +466,7 @@ export const ModuleItem: React.FC<ModuleItemProps> = ({
           {/* Центральний блок: Назва лінії / Призначення (User Label) */}
           <div
             onClick={() => onEdit(module)}
-            className="text-[11.5px] font-extrabold text-slate-900 leading-snug line-clamp-2 px-1 py-1 rounded hover:bg-amber-100/90 cursor-pointer w-full text-center transition-colors"
+            className="text-[11.5px] font-normal text-slate-900 leading-snug line-clamp-2 px-1 py-1 rounded hover:bg-amber-100/90 cursor-pointer w-full text-center transition-colors"
             title={`Клікніть для редагування: ${module.label || module.name}`}
           >
             {module.label || module.name}
@@ -428,6 +478,29 @@ export const ModuleItem: React.FC<ModuleItemProps> = ({
               <div className="px-2 py-0.5 bg-slate-950 rounded border border-slate-800 text-red-500 font-mono font-bold text-[11px] tracking-wider shadow-inner flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
                 230 V
+              </div>
+            ) : isPhaseSelector ? (
+              <div className="flex flex-col items-center gap-1 w-full px-1">
+                {/* Індикатори 3-х вхідних фаз L1, L2, L3 з підсвіткою активної фази */}
+                <div className="flex items-center justify-center gap-1 bg-slate-950 px-2 py-1 rounded border border-slate-800 shadow-inner w-full max-w-[130px]">
+                  <span className="flex items-center gap-0.5 text-[8.5px] font-mono font-bold text-emerald-400">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_4px_#34d399]" />
+                    L1
+                  </span>
+                  <span className="text-slate-600 text-[8px]">•</span>
+                  <span className="flex items-center gap-0.5 text-[8.5px] font-mono font-bold text-amber-300">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                    L2
+                  </span>
+                  <span className="text-slate-600 text-[8px]">•</span>
+                  <span className="flex items-center gap-0.5 text-[8.5px] font-mono font-bold text-red-400">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                    L3
+                  </span>
+                </div>
+                <div className="font-mono font-black text-[10px] text-violet-900 bg-violet-100 px-1.5 py-0.5 rounded border border-violet-300 truncate max-w-full">
+                  {module.rating}
+                </div>
               </div>
             ) : isSwitch ? (
               <div className="flex flex-col items-center gap-0.5">
